@@ -1,0 +1,1532 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<script src="/tranca-guarda.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Jarvis — Modelo 3D</title>
+<style>
+:root{--ciano:#2f8fa8;--ambar:#b06b14;--tinta:#16202b;--tinta-f:#5c6b7a;
+  --vidro:rgba(255,255,255,.72);--linha:rgba(22,32,43,.22);
+  --display:ui-monospace,"Cascadia Mono",Consolas,monospace}
+body.escuro{--ciano:#6fe3f2;--ambar:#ffb347;--tinta:#e8eef8;--tinta-f:#7d8a9c;
+  --vidro:rgba(10,16,24,.62);--linha:rgba(111,227,242,.28)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#eef1f5;color:var(--tinta);overflow:hidden;
+  font-family:system-ui,"Segoe UI",sans-serif;transition:background .25s}
+body.escuro{background:#05080d}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#hud{position:fixed;inset:0;display:grid;grid-template-columns:auto 1fr auto;
+  grid-template-rows:auto 1fr auto;padding:18px;gap:12px;pointer-events:none}
+#hud>*{pointer-events:auto}
+.bloco{background:var(--vidro);backdrop-filter:blur(5px);padding:10px 13px;
+  border-left:1px solid var(--linha)}
+#marca{grid-column:1;grid-row:1;max-width:min(345px,74vw)}
+#marca h1{font-family:var(--display);font-size:13px;letter-spacing:.18em;
+  text-transform:uppercase;margin:0 0 6px}
+#marca p{margin:0;font-size:11px;color:var(--tinta-f);line-height:1.6}
+#ferramentas{grid-column:3;grid-row:1;display:flex;gap:8px;align-items:start;
+  flex-wrap:wrap;justify-content:flex-end;max-width:60vw}
+.bt{font-family:var(--display);font-size:9.5px;letter-spacing:.17em;text-transform:uppercase;
+  cursor:pointer;padding:7px 11px;background:var(--vidro);color:var(--tinta);
+  border:1px solid var(--linha);text-decoration:none;display:inline-block;transition:.18s}
+.bt:hover{border-color:var(--ciano);color:var(--ciano)}
+.bt.lig{border-color:var(--ambar);color:var(--ambar)}
+#ficha{grid-column:1;grid-row:3;align-self:end;max-width:min(390px,80vw);
+  border-left-color:var(--ambar)}
+#ficha h2{font-family:var(--display);font-size:13px;margin:0 0 6px}
+#ficha .lic{margin:6px 0 0;font-size:10.5px;color:var(--tinta-f);line-height:1.5}
+#painel{grid-column:3;grid-row:3;align-self:end;justify-self:end;
+  max-width:min(300px,80vw);min-width:min(240px,80vw);text-align:right}
+#painel .rot{font-family:var(--display);font-size:9px;letter-spacing:.17em;
+  text-transform:uppercase;color:var(--tinta-f);margin:0 0 7px}
+#desmontar{width:100%;accent-color:var(--ambar);cursor:pointer;margin:0;display:block}
+#peca{margin:9px 0 0;font-size:11px;color:var(--tinta);min-height:15px;line-height:1.45}
+#estado{margin:7px 0 0;font-family:var(--display);font-size:9px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--tinta-f);line-height:1.7}
+#aviso{grid-column:2;grid-row:2;align-self:center;justify-self:center;text-align:center;
+  max-width:min(470px,86vw);font-size:13px;line-height:1.6;color:var(--tinta-f)}
+#aviso b{color:var(--ambar);font-weight:600}
+</style>
+</head>
+<body class="claro">
+<canvas id="tela"></canvas>
+<div id="hud">
+  <div id="marca" class="bloco">
+    <h1>Modelo 3D</h1>
+    <p><b>Mouse</b> · arrastar gira · roda aproxima · clique seleciona<br>
+       <b>botão direito arrastando uma peça</b> tira a peça · botão <b>Desmontar</b> embaixo abre tudo<br>
+       <b>Mãos</b> · mão aberta ou dedo mexendo gira (e continua girando se soltar com impulso)<br>
+       mão fechada agarra e gira · fechar em cima da peça selecionada tira a peça<br>
+       indicador parado numa peça seleciona · duas mãos fechadas: afastar desmonta, juntar monta</p>
+  </div>
+  <div id="ferramentas">
+    <button class="bt" id="bModo" type="button">Holograma</button>
+    <button class="bt" id="bFundo" type="button">Fundo escuro</button>
+    <button class="bt" id="bGestos" type="button">Gestos</button>
+    <button class="bt" id="bCalibrar" type="button" hidden style="display:none">Calibrar mãos</button>
+    <a class="bt" href="/modelo.html">Galeria</a>
+    <a class="bt" href="/universo.html">Universo</a>
+    <a class="bt" href="/">Início</a>
+  </div>
+  <div id="ficha" class="bloco" hidden>
+    <h2 id="f-nome"></h2>
+    <p id="f-desc" style="margin:0;font-size:11.5px;color:var(--tinta)"></p>
+    <p class="lic" id="f-lic"></p>
+  </div>
+  <div id="painel" class="bloco">
+    <!-- a barra de desmontar saiu da tela (16/11): desmontar e com as maos.
+         O controle segue existindo escondido, so como valor interno. -->
+    <input id="desmontar" type="range" min="0" max="100" value="0" aria-label="Desmontar" hidden style="display:none">
+    <p id="peca"></p>
+    <p id="estado">carregando…</p>
+  </div>
+  <div id="aviso" hidden></div>
+</div>
+<!-- 17/11: desmontar com o mouse sem esconder nada — um botao grande no
+     meio, embaixo. -->
+<button id="bDesm" type="button" title="Desmontar / montar o modelo (Ctrl + roda do mouse abre aos poucos)"
+  style="position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:45;
+  font:700 12px/1 ui-monospace,Consolas,monospace;letter-spacing:.22em;text-transform:uppercase;
+  padding:14px 30px;cursor:pointer;color:#8fe6ff;background:rgba(4,14,26,.88);
+  border:1px solid rgba(111,227,242,.6);box-shadow:0 0 22px -6px rgba(80,210,255,.8)">⊕ Desmontar</button>
+<script>
+(function(){
+"use strict";
+var corpo=document.body,
+    elEstado=document.getElementById("estado"),
+    elPeca=document.getElementById("peca"),
+    elAviso=document.getElementById("aviso"),
+    ficha=document.getElementById("ficha"),
+    bModo=document.getElementById("bModo"),
+    bFundo=document.getElementById("bFundo"),
+    slider=document.getElementById("desmontar");
+
+function estado(t){ elEstado.innerHTML=t; }
+function avisar(html){ elAviso.hidden=false; elAviso.innerHTML=html; estado("parado"); }
+
+/* ===================== leitor de .glb, escrito a mao =====================
+   Sem three.js: o servidor bloqueia CDN por CSP. Le geometria, materiais e
+   as texturas embutidas no arquivo — que e o que faz o objeto parecer o
+   objeto. O que NAO e suportado esta dito em voz alta, nao vira tela preta. */
+var JSON_CHUNK=0x4E4F534A, BIN_CHUNK=0x004E4942, MAGIC=0x46546C67;
+var N_COMP={SCALAR:1,VEC2:2,VEC3:3,VEC4:4,MAT2:4,MAT3:9,MAT4:16};
+var T_BYTES={5120:1,5121:1,5122:2,5123:2,5125:4,5126:4};
+
+function abrirGLB(buf){
+  var dv=new DataView(buf);
+  if(buf.byteLength<12 || dv.getUint32(0,true)!==MAGIC)
+    throw new Error("Isso nao e um arquivo .glb.");
+  if(dv.getUint32(4,true)!==2) throw new Error("Versao de glTF diferente de 2.");
+  var off=12,g=null,bin=null;
+  while(off+8<=buf.byteLength){
+    var tam=dv.getUint32(off,true), tipo=dv.getUint32(off+4,true), ini=off+8;
+    if(ini+tam>buf.byteLength) break;
+    if(tipo===JSON_CHUNK) g=JSON.parse(new TextDecoder("utf-8").decode(new Uint8Array(buf,ini,tam)));
+    else if(tipo===BIN_CHUNK) bin=new Uint8Array(buf,ini,tam);
+    off=ini+tam; off+=(4-(off%4))%4;
+  }
+  if(!g) throw new Error("O arquivo nao tem a parte de descricao (JSON).");
+  var exige=g.extensionsRequired||[];
+  for(var i=0;i<exige.length;i++){
+    if(exige[i]==="KHR_draco_mesh_compression")
+      throw new Error("Este modelo vem comprimido com Draco, que eu ainda nao sei abrir. Procure a versao glTF-Binary simples.");
+    if(exige[i].indexOf("meshopt")>=0)
+      throw new Error("Este modelo usa compressao meshopt, que eu ainda nao sei abrir.");
+  }
+  return {g:g,bin:bin};
+}
+
+function lerNumeros(g,bin,idx){
+  var a=g.accessors[idx];
+  var n=N_COMP[a.type]||1, bytes=T_BYTES[a.componentType];
+  var out=new Float32Array(a.count*n);
+  if(a.bufferView===undefined || !bin) return out;
+  var bv=g.bufferViews[a.bufferView];
+  var base=(bv.byteOffset||0)+(a.byteOffset||0);
+  var passo=bv.byteStride||(n*bytes);
+  var dv=new DataView(bin.buffer,bin.byteOffset,bin.byteLength);
+  for(var k=0;k<a.count;k++){
+    for(var j=0;j<n;j++){
+      var p=base+k*passo+j*bytes, v=0;
+      switch(a.componentType){
+        case 5126: v=dv.getFloat32(p,true); break;
+        case 5125: v=dv.getUint32(p,true); break;
+        case 5123: v=dv.getUint16(p,true); break;
+        case 5122: v=dv.getInt16(p,true); break;
+        case 5121: v=dv.getUint8(p); break;
+        case 5120: v=dv.getInt8(p); break;
+      }
+      if(a.normalized){
+        if(a.componentType===5121) v/=255; else if(a.componentType===5123) v/=65535;
+        else if(a.componentType===5120) v=Math.max(v/127,-1);
+        else if(a.componentType===5122) v=Math.max(v/32767,-1);
+      }
+      out[k*n+j]=v;
+    }
+  }
+  return out;
+}
+
+function ident(){return new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);}
+function mul(a,b){var o=new Float32Array(16);
+  for(var i=0;i<4;i++)for(var j=0;j<4;j++){var s=0;
+    for(var k=0;k<4;k++)s+=a[k*4+j]*b[i*4+k];o[i*4+j]=s;}return o;}
+function trans(x,y,z){var m=ident();m[12]=x;m[13]=y;m[14]=z;return m;}
+function escala(x,y,z){var m=ident();m[0]=x;m[5]=y;m[10]=z;return m;}
+function deQuat(q){
+  var x=q[0],y=q[1],z=q[2],w=q[3],m=ident();
+  m[0]=1-2*(y*y+z*z); m[1]=2*(x*y+z*w);   m[2]=2*(x*z-y*w);
+  m[4]=2*(x*y-z*w);   m[5]=1-2*(x*x+z*z); m[6]=2*(y*z+x*w);
+  m[8]=2*(x*z+y*w);   m[9]=2*(y*z-x*w);   m[10]=1-2*(x*x+y*y);
+  return m;
+}
+function matrizDoNo(no){
+  if(no.matrix) return new Float32Array(no.matrix);
+  var m=ident();
+  if(no.scale) m=mul(escala(no.scale[0],no.scale[1],no.scale[2]),m);
+  if(no.rotation) m=mul(deQuat(no.rotation),m);
+  if(no.translation) m=mul(trans(no.translation[0],no.translation[1],no.translation[2]),m);
+  return m;
+}
+function aplicar(m,x,y,z,w){
+  return [m[0]*x+m[4]*y+m[8]*z+m[12]*w,
+          m[1]*x+m[5]*y+m[9]*z+m[13]*w,
+          m[2]*x+m[6]*y+m[10]*z+m[14]*w];
+}
+function calcularNormais(pos,nor,idx){
+  for(var t=0;t+2<idx.length;t+=3){
+    var a=idx[t]*3,b=idx[t+1]*3,c=idx[t+2]*3;
+    var ux=pos[b]-pos[a],uy=pos[b+1]-pos[a+1],uz=pos[b+2]-pos[a+2];
+    var vx=pos[c]-pos[a],vy=pos[c+1]-pos[a+1],vz=pos[c+2]-pos[a+2];
+    var nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+    nor[a]+=nx;nor[a+1]+=ny;nor[a+2]+=nz;
+    nor[b]+=nx;nor[b+1]+=ny;nor[b+2]+=nz;
+    nor[c]+=nx;nor[c+1]+=ny;nor[c+2]+=nz;
+  }
+  for(var s=0;s<nor.length;s+=3){
+    var L=Math.hypot(nor[s],nor[s+1],nor[s+2])||1;
+    nor[s]/=L;nor[s+1]/=L;nor[s+2]/=L;
+  }
+}
+
+var TETO_PECAS=80;   /* acima disso nao e desmontar, e estilhacar */
+
+function separarPecas(pos,idx,eps){
+  /* Pedacos geometricamente desconectados. O .glb costuma trazer o objeto
+     inteiro como UMA malha — a antena e o corpo do radio sao a mesma
+     primitiva —, entao a "peca" tem de ser descoberta na geometria.
+     Solda por posicao primeiro: a costura da textura duplica vertices no
+     mesmo ponto, e sem soldar o objeto sairia rachado nas emendas. */
+  var nv=pos.length/3, rep=new Int32Array(nv), mapa=Object.create(null), n=0;
+  for(var i=0;i<nv;i++){
+    var k=Math.round(pos[i*3]/eps)+"_"+Math.round(pos[i*3+1]/eps)+"_"+
+          Math.round(pos[i*3+2]/eps);
+    var r=mapa[k];
+    if(r===undefined){ r=n++; mapa[k]=r; }
+    rep[i]=r;
+  }
+  var pai=new Int32Array(n);
+  for(var j=0;j<n;j++) pai[j]=j;
+  function acha(x){ while(pai[x]!==x){ pai[x]=pai[pai[x]]; x=pai[x]; } return x; }
+  function une(a,b){ a=acha(a); b=acha(b); if(a!==b) pai[b]=a; }
+  for(var t=0;t+2<idx.length;t+=3){
+    une(rep[idx[t]],rep[idx[t+1]]); une(rep[idx[t]],rep[idx[t+2]]);
+  }
+  var grupos=Object.create(null), ordem=[];
+  for(var t2=0;t2+2<idx.length;t2+=3){
+    var g=acha(rep[idx[t2]]);
+    if(!grupos[g]){ grupos[g]=[]; ordem.push(g); }
+    grupos[g].push(idx[t2],idx[t2+1],idx[t2+2]);
+  }
+  if(ordem.length<2 || ordem.length>TETO_PECAS) return null;
+  ordem.sort(function(a,b){ return grupos[b].length-grupos[a].length; });
+  return ordem.map(function(g){ return grupos[g]; });
+}
+
+function montarPartes(g,bin){
+  var partes=[];
+  var cenaIdx=(g.scene!==undefined)?g.scene:0;
+  var cena=(g.scenes&&g.scenes[cenaIdx])||{nodes:[]};
+
+  function visitar(iNo,pai){
+    var no=(g.nodes||[])[iNo]; if(!no) return;
+    var m=mul(pai,matrizDoNo(no));
+    if(no.mesh!==undefined && g.meshes&&g.meshes[no.mesh]){
+      var prims=g.meshes[no.mesh].primitives||[];
+      for(var p=0;p<prims.length;p++){
+        var pr=prims[p];
+        if(pr.mode!==undefined && pr.mode!==4) continue;
+        var at=pr.attributes||{};
+        if(at.POSITION===undefined) continue;
+        var P=lerNumeros(g,bin,at.POSITION), nv=P.length/3;
+        var N=(at.NORMAL!==undefined)?lerNumeros(g,bin,at.NORMAL):null;
+        var Uv=(at.TEXCOORD_0!==undefined)?lerNumeros(g,bin,at.TEXCOORD_0):null;
+        var pos=new Float32Array(P.length), nor=new Float32Array(P.length);
+        for(var v=0;v<P.length;v+=3){
+          var w=aplicar(m,P[v],P[v+1],P[v+2],1);
+          pos[v]=w[0];pos[v+1]=w[1];pos[v+2]=w[2];
+          if(N){
+            var nn=aplicar(m,N[v],N[v+1],N[v+2],0);
+            var c=Math.hypot(nn[0],nn[1],nn[2])||1;
+            nor[v]=nn[0]/c;nor[v+1]=nn[1]/c;nor[v+2]=nn[2]/c;
+          }
+        }
+        var idx;
+        if(pr.indices!==undefined){
+          var I=lerNumeros(g,bin,pr.indices);
+          idx=(nv>65535)?new Uint32Array(I.length):new Uint16Array(I.length);
+          for(var k=0;k<I.length;k++) idx[k]=I[k];
+        }else{
+          idx=(nv>65535)?new Uint32Array(nv):new Uint16Array(nv);
+          for(var k2=0;k2<nv;k2++) idx[k2]=k2;
+        }
+        if(!N) calcularNormais(pos,nor,idx);
+        partes.push({pos:pos,nor:nor,uv:Uv||null,idx:idx,grande:nv>65535,
+                     mat:(pr.material!==undefined?pr.material:-1)});
+      }
+    }
+    var fs=no.children||[];
+    for(var c2=0;c2<fs.length;c2++) visitar(fs[c2],m);
+  }
+  var raizes=cena.nodes||[];
+  for(var r=0;r<raizes.length;r++) visitar(raizes[r],ident());
+  if(!partes.length) throw new Error("O modelo nao tem nenhum triangulo que eu saiba desenhar.");
+
+  var mn=[1e30,1e30,1e30], mx=[-1e30,-1e30,-1e30], nvT=0, ntT=0;
+  for(var i=0;i<partes.length;i++){
+    var P2=partes[i].pos; nvT+=P2.length/3; ntT+=partes[i].idx.length/3;
+    for(var j=0;j<P2.length;j+=3)for(var e=0;e<3;e++){
+      if(P2[j+e]<mn[e])mn[e]=P2[j+e]; if(P2[j+e]>mx[e])mx[e]=P2[j+e];
+    }
+  }
+  var cen=[(mn[0]+mx[0])/2,(mn[1]+mx[1])/2,(mn[2]+mx[2])/2];
+  var raio=0;
+  for(var i2=0;i2<partes.length;i2++){
+    var P3=partes[i2].pos;
+    for(var j2=0;j2<P3.length;j2+=3){
+      var d=Math.hypot(P3[j2]-cen[0],P3[j2+1]-cen[1],P3[j2+2]-cen[2]);
+      if(d>raio) raio=d;
+    }
+  }
+  if(!raio) raio=1;
+
+  /* cada parte vira uma ou mais pecas; as pecas dividem os mesmos
+     vertices da parte e so mudam de indices — custa quase nada */
+  var pecas=[], eps=raio*2e-4;
+  for(var a=0;a<partes.length;a++){
+    var pa=partes[a];
+    /* O limite era 8 primitivas. A Hilux tem 17, entao ela caia fora e a
+       carroceria vinha inteira. Separar e barato (solda + union-find numa
+       malha pequena), e o TETO_PECAS la embaixo ja segura o exagero. */
+    var grupos=(partes.length<=48)?separarPecas(pa.pos,pa.idx,eps):null;
+    if(!grupos) grupos=[pa.idx];
+    for(var b=0;b<grupos.length;b++){
+      var ind=grupos[b];
+      var arr=pa.grande?new Uint32Array(ind.length):new Uint16Array(ind.length);
+      for(var c3=0;c3<ind.length;c3++) arr[c3]=ind[c3];
+      var sx=0,sy=0,sz=0,q=0,visto=Object.create(null);
+      for(var c4=0;c4<arr.length;c4++){
+        var vi=arr[c4];
+        if(visto[vi]) continue;
+        visto[vi]=1; sx+=pa.pos[vi*3]; sy+=pa.pos[vi*3+1]; sz+=pa.pos[vi*3+2]; q++;
+      }
+      var cx=q?sx/q:cen[0], cy=q?sy/q:cen[1], cz=q?sz/q:cen[2];
+      var dx=cx-cen[0], dy=cy-cen[1], dz=cz-cen[2];
+      var L=Math.hypot(dx,dy,dz);
+      if(L<raio*1e-3){ dx=0; dy=1; dz=0; L=1; }   /* peca no centro sobe */
+      pecas.push({parte:pa, idx:arr, dir:[dx/L,dy/L,dz/L],
+                  triangulos:arr.length/3, f:0, alvo:0});
+    }
+  }
+  return {partes:partes, pecas:pecas, vertices:nvT, triangulos:ntT,
+          centro:cen, raio:raio, escala:1/raio};
+}
+window.jarvisAbrirGLB=abrirGLB;
+window.jarvisPartes=montarPartes;
+
+/* ============================ desenho ============================ */
+var cv=document.getElementById("tela");
+var gl=cv.getContext("webgl",{antialias:true,alpha:false,depth:true})||
+       cv.getContext("experimental-webgl");
+if(!gl){ avisar("Este navegador nao tem WebGL."); return; }
+
+var VS=[
+"attribute vec3 pos; attribute vec3 nor; attribute vec2 uv;",
+"uniform mat4 mvp; uniform mat4 mv; uniform vec3 desloc;",
+"varying vec3 vN; varying vec3 vP; varying vec2 vUv;",
+"void main(){ vec3 p=pos+desloc;",
+"  vN=mat3(mv)*nor; vP=(mv*vec4(p,1.0)).xyz; vUv=uv;",
+"  gl_Position=mvp*vec4(p,1.0); gl_PointSize=1.6; }"].join("\n");
+
+var FS=[
+"precision mediump float;",
+"varying vec3 vN; varying vec3 vP; varying vec2 vUv;",
+"uniform sampler2D mapa; uniform float temMapa;",
+"uniform sampler2D mapaEmis; uniform float temEmis; uniform vec3 corEmis;",
+"uniform vec4 corBase; uniform float corte;",
+"uniform float holo; uniform float forca; uniform float claro;",
+"uniform float atenua; uniform vec3 corPlana; uniform float plano;",
+"void main(){",
+"  if(plano>0.5){ gl_FragColor=vec4(corPlana,1.0); return; }",
+"  vec4 base=corBase;",
+"  if(temMapa>0.5) base*=texture2D(mapa,vUv);",
+"  if(base.a<corte) discard;",
+"  vec3 n=normalize(vN);",
+"  if(!gl_FrontFacing) n=-n;",
+"  vec3 v=normalize(-vP);",
+"  if(holo>0.5){",
+"    float borda=pow(1.0-abs(dot(n,v)),2.2);",
+"    gl_FragColor=vec4(vec3(0.43,0.89,0.95)*(0.018+borda*1.70)*forca*atenua,1.0);",
+"    return;",
+"  }",
+"  vec3 cor=pow(base.rgb,vec3(2.2));",
+"  vec3 L1=normalize(vec3(0.35,0.80,0.55));",
+"  vec3 L2=normalize(vec3(-0.70,0.10,0.35));",
+"  float d1=max(dot(n,L1),0.0), d2=max(dot(n,L2),0.0);",
+"  float rim=pow(1.0-max(dot(n,v),0.0),3.0);",
+"  float amb=mix(0.10,0.40,claro);",
+"  vec3 luz=vec3(amb)+vec3(1.00,0.98,0.95)*d1*mix(0.78,0.62,claro)",
+"          +vec3(0.34,0.50,0.68)*d2*0.30;",
+"  vec3 emis=corEmis;",
+"  if(temEmis>0.5) emis*=pow(texture2D(mapaEmis,vUv).rgb,vec3(2.2));",
+"  vec3 saida=cor*luz+emis+vec3(0.20,0.50,0.60)*rim*mix(0.16,0.0,claro);",
+"  saida=pow(saida,vec3(1.0/2.2));",
+"  saida=mix(mix(vec3(0.05,0.07,0.09),vec3(0.90,0.92,0.94),claro),saida,atenua);",
+"  gl_FragColor=vec4(saida,1.0);",
+"}"].join("\n");
+
+function compilar(t,src){
+  var s=gl.createShader(t); gl.shaderSource(s,src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))
+    throw new Error("shader: "+gl.getShaderInfoLog(s));
+  return s;
+}
+var prog=gl.createProgram();
+gl.attachShader(prog,compilar(gl.VERTEX_SHADER,VS));
+gl.attachShader(prog,compilar(gl.FRAGMENT_SHADER,FS));
+gl.linkProgram(prog);
+if(!gl.getProgramParameter(prog,gl.LINK_STATUS)){ avisar("Falhou ao montar o shader."); return; }
+gl.useProgram(prog);
+var aPos=gl.getAttribLocation(prog,"pos"), aNor=gl.getAttribLocation(prog,"nor"),
+    aUv=gl.getAttribLocation(prog,"uv");
+var U={};
+["mvp","mv","desloc","mapa","temMapa","mapaEmis","temEmis","corEmis","corBase",
+ "corte","holo","forca","claro","atenua","corPlana","plano"].forEach(function(n){
+  U[n]=gl.getUniformLocation(prog,n);
+});
+
+var cena=null, holo=false, claro=true, uint32ok=!!gl.getExtension("OES_element_index_uint");
+var fator=0, fatorAlvo=0, selecao=-1;
+var branca=gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D,branca);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,
+  new Uint8Array([255,255,255,255]));
+
+function pot(x){ return (x&(x-1))===0 && x>0; }
+
+async function texturaDe(g,bin,iTex){
+  var t=(g.textures||[])[iTex]; if(!t) return null;
+  var fonte=t.source;
+  if(fonte===undefined && t.extensions){
+    for(var k in t.extensions){ if(t.extensions[k].source!==undefined) fonte=t.extensions[k].source; }
+  }
+  var src=(g.images||[])[fonte]; if(!src) return null;
+  var bytes=null;
+  if(src.bufferView!==undefined && bin){
+    var bv=g.bufferViews[src.bufferView];
+    bytes=new Uint8Array(bin.buffer, bin.byteOffset+(bv.byteOffset||0), bv.byteLength);
+  }else if(src.uri && src.uri.slice(0,5)==="data:"){
+    var b64=src.uri.split(",")[1]||"", crua=atob(b64);
+    bytes=new Uint8Array(crua.length);
+    for(var i=0;i<crua.length;i++) bytes[i]=crua.charCodeAt(i);
+  }else return null;
+  var tipo=src.mimeType||"image/png";
+  if(tipo.indexOf("ktx")>=0) return null;
+  var img;
+  try{ img=await createImageBitmap(new Blob([bytes],{type:tipo})); }
+  catch(e){ return null; }
+  var tex=gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D,tex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);
+  if(pot(img.width)&&pot(img.height)){
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+  }else{
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  }
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  if(img.close) img.close();
+  return tex;
+}
+
+async function prepararCena(g,bin,dados){
+  for(var i=0;i<dados.partes.length;i++){
+    var p=dados.partes[i];
+    if(p.grande && !uint32ok) throw new Error("O modelo tem vertices demais para esta placa de video.");
+    p.bPos=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,p.bPos);
+    gl.bufferData(gl.ARRAY_BUFFER,p.pos,gl.STATIC_DRAW);
+    p.bNor=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,p.bNor);
+    gl.bufferData(gl.ARRAY_BUFFER,p.nor,gl.STATIC_DRAW);
+    if(p.uv){ p.bUv=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,p.bUv);
+              gl.bufferData(gl.ARRAY_BUFFER,p.uv,gl.STATIC_DRAW); }
+    p.tipoIdx=p.grande?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT;
+    var mat=(g.materials||[])[p.mat]||{}, pbr=mat.pbrMetallicRoughness||{};
+    p.cor=pbr.baseColorFactor||[1,1,1,1];
+    p.corte=(mat.alphaMode==="MASK")?(mat.alphaCutoff!==undefined?mat.alphaCutoff:0.5):0.01;
+    p.tex=null; p.texE=null; p.emis=mat.emissiveFactor||[0,0,0];
+    if(pbr.baseColorTexture && pbr.baseColorTexture.index!==undefined)
+      p.tex=await texturaDe(g,bin,pbr.baseColorTexture.index);
+    if(mat.emissiveTexture && mat.emissiveTexture.index!==undefined)
+      p.texE=await texturaDe(g,bin,mat.emissiveTexture.index);
+  }
+  for(var j=0;j<dados.pecas.length;j++){
+    var pc=dados.pecas[j];
+    pc.bIdx=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,pc.bIdx);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,pc.idx,gl.STATIC_DRAW);
+    var n=Math.floor(pc.idx.length/3);
+    var L=pc.parte.grande?new Uint32Array(n*6):new Uint16Array(n*6);
+    for(var t=0,k=0;t<n;t++){
+      var a=pc.idx[t*3],b=pc.idx[t*3+1],c=pc.idx[t*3+2];
+      L[k++]=a;L[k++]=b;L[k++]=b;L[k++]=c;L[k++]=c;L[k++]=a;
+    }
+    pc.bLin=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,pc.bLin);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,L,gl.STATIC_DRAW);
+    pc.nLin=L.length;
+  }
+  return dados;
+}
+
+function persp(f,asp,n,fa){
+  var t=1/Math.tan(f/2),o=new Float32Array(16);
+  o[0]=t/asp;o[5]=t;o[10]=(fa+n)/(n-fa);o[11]=-1;o[14]=2*fa*n/(n-fa);return o;
+}
+function rotX(a){var c=Math.cos(a),s=Math.sin(a),m=ident();m[5]=c;m[6]=s;m[9]=-s;m[10]=c;return m;}
+function rotY(a){var c=Math.cos(a),s=Math.sin(a),m=ident();m[0]=c;m[2]=-s;m[8]=s;m[10]=c;return m;}
+
+/* Orientacao LIVRE (16/11): antes eram dois angulos e o de cima/baixo era
+   travado em +-83 graus — o objeto nunca virava de cabeca para baixo. Agora
+   a orientacao e uma matriz de rotacao, e cada giro e aplicado no espaco da
+   TELA: arrastar para a direita sempre gira para a direita, de qualquer
+   posicao. E nao ha mais giro automatico: posicionou, fica parado. */
+function rotZ(a){var c=Math.cos(a),s=Math.sin(a),m=ident();m[0]=c;m[1]=s;m[4]=-s;m[5]=c;return m;}
+var orient=mul(rotX(-0.18),rotY(0.7)), nGiros=0;
+function reortonormal(m){
+  var x=[m[0],m[1],m[2]], y=[m[4],m[5],m[6]];
+  var n=Math.hypot(x[0],x[1],x[2]); x=[x[0]/n,x[1]/n,x[2]/n];
+  var d=x[0]*y[0]+x[1]*y[1]+x[2]*y[2]; y=[y[0]-d*x[0],y[1]-d*x[1],y[2]-d*x[2]];
+  n=Math.hypot(y[0],y[1],y[2]); y=[y[0]/n,y[1]/n,y[2]/n];
+  var z=[x[1]*y[2]-x[2]*y[1], x[2]*y[0]-x[0]*y[2], x[0]*y[1]-x[1]*y[0]];
+  m[0]=x[0];m[1]=x[1];m[2]=x[2];m[4]=y[0];m[5]=y[1];m[6]=y[2];m[8]=z[0];m[9]=z[1];m[10]=z[2];
+}
+function girarTela(ax,ay,az){
+  if(ay) orient=mul(rotY(ay),orient);
+  if(ax) orient=mul(rotX(ax),orient);
+  if(az) orient=mul(rotZ(az),orient);
+  if(++nGiros%30===0) reortonormal(orient);
+}
+var dist=2.9, arrast=false, px=0, py=0, girando=false, moveu=0;
+var pan=[0,0];   /* onde o objeto esta na tela (mao fechada arrasta; C recentraliza) */
+/* 17/11: desmontar tambem com o MOUSE. Apertar sobre a peca ja
+   selecionada (ou Shift + apertar sobre qualquer peca) e arrastar tira a
+   peca do lugar, e ela fica onde foi solta. Duplo clique no vazio, Esc ou
+   o botao Montar recolhem tudo. */
+var arrastaPeca=-1;
+cv.addEventListener("pointerdown",function(e){
+  arrast=true; moveu=0; px=e.clientX; py=e.clientY; arrastaPeca=-1;
+  if(cena && (e.button===0 || e.button===2)){
+    var ip=escolher(e.clientX,e.clientY);
+    /* botao direito em cima de uma peca, ou esquerdo na peca ja selecionada */
+    if(ip>=0 && (e.button===2 || ip===selecao || e.shiftKey)){
+      arrastaPeca=ip; cena.pecas[ip].segura=true;
+      if(selecao!==ip){ selecao=ip; mostrarPeca(); }
+    }
+  }
+  try{cv.setPointerCapture(e.pointerId);}catch(x){}
+});
+cv.addEventListener("pointermove",function(e){
+  if(!arrast)return;
+  var dx=e.clientX-px, dy=e.clientY-py;
+  if(arrastaPeca>=0){
+    moveu+=Math.abs(dx)+Math.abs(dy);
+    var rr=cv.getBoundingClientRect();
+    window.jarvisGesto.puxar(arrastaPeca, dx/Math.max(1,rr.width), dy/Math.max(1,rr.height));
+    px=e.clientX; py=e.clientY; return;
+  }
+  moveu+=Math.abs(dx)+Math.abs(dy);
+  if(moveu>4) girando=false;
+  girarTela(dy*.008, dx*.008, 0);
+  px=e.clientX; py=e.clientY;
+});
+var relogioClique=0;
+cv.addEventListener("pointerup",function(e){
+  arrast=false;
+  if(arrastaPeca>=0){
+    var pa=cena.pecas[arrastaPeca]; pa.segura=false;
+    arrastaPeca=-1;
+    if(moveu>4){ pa.fixa=true; atualizarDesm(); mostrarPeca(); return; }   /* fica onde soltou */
+    if(e.button===2) return;
+  }
+  if(moveu>4) return;
+  var i=escolher(e.clientX,e.clientY);
+  if(i<0){ selecao=-1; mostrarPeca(); return; }
+  /* Gustavo (14/11/2026): clicar numa peca so SELECIONA — ela acende e as
+     outras escurecem, mas nada sai do lugar; o modelo fica sempre inteiro.
+     Clicar de novo na mesma peca desmarca. Antes o clique arrancava a peca.
+     Desmontar de verdade continua existindo, na barra e na mao fechada. */
+  selecao=(selecao===i)?-1:i;
+  mostrarPeca();
+});
+function recolherPecas(){
+  if(!cena) return false;
+  var algum=false;
+  for(var i=0;i<cena.pecas.length;i++){ var p=cena.pecas[i]; if(p.fixa||p.puxa){ p.fixa=false; algum=true; } }
+  return algum;
+}
+cv.addEventListener("contextmenu",function(e){ e.preventDefault(); });
+cv.addEventListener("dblclick",function(e){
+  if(cena && escolher(e.clientX,e.clientY)<0){
+    recolherPecas(); fatorAlvo=0; slider.value=0; atualizarDesm(); mostrarPeca();
+  }
+});
+var bDesm=document.getElementById("bDesm");
+function atualizarDesm(){
+  if(!bDesm) return;
+  var aberto=fatorAlvo>0.05 || (cena && cena.pecas.some(function(p){return p.fixa;}));
+  bDesm.textContent=aberto?"⊖ Montar":"⊕ Desmontar";
+  bDesm.style.color=aberto?"#ffc46b":"#8fe6ff";
+  bDesm.style.borderColor=aberto?"rgba(255,196,107,.7)":"rgba(111,227,242,.6)";
+}
+if(bDesm) bDesm.addEventListener("click",function(){
+  if(fatorAlvo>0.05 || (cena && cena.pecas.some(function(p){return p.fixa;}))){
+    fatorAlvo=0; recolherPecas();
+  } else fatorAlvo=0.6;
+  slider.value=Math.round(fatorAlvo*100); atualizarDesm(); mostrarPeca();
+});
+cv.addEventListener("wheel",function(e){
+  if(e.ctrlKey){   /* Ctrl + roda: desmonta / monta aos poucos */
+    e.preventDefault();
+    fatorAlvo=Math.max(0,Math.min(1,fatorAlvo+(e.deltaY<0?.07:-.07)));
+    slider.value=Math.round(fatorAlvo*100); atualizarDesm(); return;
+  }
+  e.preventDefault(); dist=Math.max(1.25,Math.min(9,dist*(1+(e.deltaY>0?.11:-.11))));
+},{passive:false});
+
+function fundoGl(){
+  if(claro && !holo) gl.clearColor(.925,.937,.953,1);
+  else gl.clearColor(.02,.031,.051,1);
+}
+function trocarModo(){
+  holo=!holo;
+  bModo.textContent=holo?"Real":"Holograma";
+  bModo.classList.toggle("lig",holo);
+  corpo.classList.toggle("escuro",holo||!claro);
+  corpo.classList.toggle("claro",!(holo||!claro));
+  fundoGl();
+}
+function trocarFundo(){
+  claro=!claro;
+  bFundo.textContent=claro?"Fundo escuro":"Fundo claro";
+  corpo.classList.toggle("escuro",holo||!claro);
+  corpo.classList.toggle("claro",!(holo||!claro));
+  fundoGl();
+}
+bModo.addEventListener("click",trocarModo);
+bFundo.addEventListener("click",trocarFundo);
+slider.addEventListener("input",function(){ fatorAlvo=(+slider.value)/100; });
+/* Ponte para a camada de gestos, que mora em outro <script> (modulo) e nao
+   enxerga as variaveis daqui. Ela so pode fazer estas tres coisas. */
+var focoAntes=-1;
+window.jarvisGesto={
+  girar:function(dx,dy){ girando=false; girarTela(dy,dx,0); },
+  rolar:function(a){ girando=false; girarTela(0,0,a); },
+  /* gira em torno de um eixo qualquer da tela (o giro do pulso) */
+  girarEixo:function(e,a){
+    girando=false;
+    var n=Math.hypot(e[0],e[1],e[2])||1, x=e[0]/n, y=e[1]/n, z=e[2]/n;
+    var c=Math.cos(a), s=Math.sin(a), t=1-c, m=ident();
+    m[0]=t*x*x+c;   m[1]=t*x*y+s*z; m[2]=t*x*z-s*y;
+    m[4]=t*x*y-s*z; m[5]=t*y*y+c;   m[6]=t*y*z+s*x;
+    m[8]=t*x*z+s*y; m[9]=t*y*z-s*x; m[10]=t*z*z+c;
+    orient=mul(m,orient);
+    if(++nGiros%30===0) reortonormal(orient);
+  },
+  fator:function(){ return fatorAlvo; },
+  desmontar:function(f){ fatorAlvo=Math.max(0,Math.min(1,f)); slider.value=Math.round(fatorAlvo*100); if(typeof atualizarDesm==="function") atualizarDesm(); },
+  zoom:function(k){ dist=Math.max(1.25,Math.min(9,dist*k)); },
+  /* qual peca esta em (nx,ny), de 0 a 1 na tela; -1 se nenhuma */
+  pegarPeca:function(nx,ny){
+    if(!cena) return -1;
+    var r=cv.getBoundingClientRect();
+    return escolher(r.left+nx*r.width, r.top+ny*r.height);
+  },
+  /* agarrou: a peca acende e as outras escurecem enquanto ela esta na mao */
+  focar:function(i){ if(!cena||!cena.pecas[i]) return; focoAntes=selecao; selecao=i; cena.pecas[i].segura=true; mostrarPeca(); },
+  /* arrasta a peca junto com a mao: o deslocamento na tela vira
+     deslocamento no espaco do modelo (inversa da rotacao atual) */
+  puxar:function(i,dxN,dyN){
+    var pc=cena&&cena.pecas[i]; if(!pc) return;
+    var r=cv.getBoundingClientRect(), asp=r.width/Math.max(1,r.height);
+    var meia=Math.tan(.46)*dist;                       /* metade da altura visivel */
+    var vx=dxN*2*meia*asp, vy=-dyN*2*meia;
+    var R=orient, k=cena.escala||1;
+    var mx=(R[0]*vx+R[1]*vy)/k, my=(R[4]*vx+R[5]*vy)/k, mz=(R[8]*vx+R[9]*vy)/k;
+    pc.puxa=pc.puxa||[0,0,0]; pc.puxa[0]+=mx; pc.puxa[1]+=my; pc.puxa[2]+=mz;
+  },
+  soltarPeca:function(i,ficar){
+    var pc=cena&&cena.pecas[i]; if(!pc) return;
+    pc.segura=false; if(ficar) pc.fixa=true;
+    selecao=ficar?i:focoAntes; focoAntes=-1; mostrarPeca();
+  },
+  selecionada:function(){ return selecao; },
+  /* seleciona (ou desmarca) a peca em (nx,ny). So seleciona; nada sai do lugar. */
+  clicar:function(nx,ny){
+    if(!cena) return false;
+    var r=cv.getBoundingClientRect();
+    var i=escolher(r.left+nx*r.width, r.top+ny*r.height);
+    if(i<0) return false;
+    selecao=(selecao===i)?-1:i;
+    mostrarPeca();
+    return true;
+  },
+  area:function(){ return cv.getBoundingClientRect(); },
+  /* arrasta o objeto pela tela, na mesma medida da mao */
+  mover:function(dxN,dyN){
+    var r=cv.getBoundingClientRect(), asp=r.width/Math.max(1,r.height), meia=Math.tan(.46)*dist;
+    pan[0]+=dxN*2*meia*asp; pan[1]-=dyN*2*meia;
+  },
+  centralizar:function(){ pan=[0,0]; }
+};
+document.addEventListener("keydown",function(e){
+  if(e.target&&/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if(e.key==="Escape"){
+    if(selecao>=0){ selecao=-1; mostrarPeca(); return; }
+    if(recolherPecas()){ mostrarPeca(); return; }
+    if(fatorAlvo>0){ fatorAlvo=0; slider.value=0; atualizarDesm(); mostrarPeca(); return; }
+    if(cena && soltas()){                      /* recolhe o que foi solto */
+      for(var i=0;i<cena.pecas.length;i++) cena.pecas[i].alvo=0;
+      mostrarPeca(); return;
+    }
+    window.location.href="/universo.html";
+  }
+  else if(e.key==="h"||e.key==="H") trocarModo();
+  else if(e.key==="c"||e.key==="C"){ pan=[0,0]; }
+  else if(e.key==="d"||e.key==="D"){ fatorAlvo=fatorAlvo>0.05?0:0.6; slider.value=Math.round(fatorAlvo*100); atualizarDesm(); }
+  else if(e.key==="f"||e.key==="F") trocarFundo();
+  else if(e.key===" "){ girando=!girando; e.preventDefault(); }
+});
+
+var P=ident(), Mat=ident();
+function medir(){
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  var w=cv.clientWidth||1, h=cv.clientHeight||1;
+  cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr);
+  gl.viewport(0,0,cv.width,cv.height);
+  P=persp(.92,w/h,.03,60);
+}
+window.addEventListener("resize",medir); medir(); fundoGl();
+
+/* Duas forcas empurram a peca para fora: a barra (desmonta tudo junto) e o
+   clique (solta aquela peca). Vale a maior das duas, entao soltar na mao
+   nunca briga com a barra. */
+function deslocDe(pc){
+  var k=Math.max(fator, pc.f||0), u=pc.puxa||[0,0,0];
+  if(k<=0.0005) return [u[0],u[1],u[2]];
+  var d=k*cena.raio*0.95;
+  return [pc.dir[0]*d+u[0], pc.dir[1]*d+u[1], pc.dir[2]*d+u[2]];
+}
+function soltas(){
+  var n=0;
+  for(var i=0;i<cena.pecas.length;i++) if(cena.pecas[i].alvo) n++;
+  return n;
+}
+function ligarAtributos(p){
+  gl.bindBuffer(gl.ARRAY_BUFFER,p.bPos);
+  gl.enableVertexAttribArray(aPos); gl.vertexAttribPointer(aPos,3,gl.FLOAT,false,0,0);
+  gl.bindBuffer(gl.ARRAY_BUFFER,p.bNor);
+  gl.enableVertexAttribArray(aNor); gl.vertexAttribPointer(aNor,3,gl.FLOAT,false,0,0);
+  if(aUv>=0){
+    if(p.bUv){ gl.bindBuffer(gl.ARRAY_BUFFER,p.bUv);
+               gl.enableVertexAttribArray(aUv); gl.vertexAttribPointer(aUv,2,gl.FLOAT,false,0,0); }
+    else { gl.disableVertexAttribArray(aUv); gl.vertexAttrib2f(aUv,0,0); }
+  }
+}
+
+/* --- escolher peca: desenha cada uma com uma cor unica num quadro
+       invisivel e le o pixel do clique. Sem matematica de raio. --- */
+var fbo=null, texFbo=null, rbo=null, fboW=0, fboH=0;
+function prepararFbo(w,h){
+  if(fbo && fboW===w && fboH===h) return;
+  if(fbo){ gl.deleteFramebuffer(fbo); gl.deleteTexture(texFbo); gl.deleteRenderbuffer(rbo); }
+  fboW=w; fboH=h;
+  texFbo=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,texFbo);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  rbo=gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER,rbo);
+  gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,w,h);
+  fbo=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,texFbo,0);
+  gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,rbo);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+}
+function escolher(cx,cy){
+  if(!cena || cena.pecas.length<2) return -1;
+  var r=cv.getBoundingClientRect(), w=cv.width, h=cv.height;
+  var x=Math.round((cx-r.left)/r.width*w), y=Math.round((1-(cy-r.top)/r.height)*h);
+  if(x<0||y<0||x>=w||y>=h) return -1;
+  prepararFbo(w,h);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+  gl.viewport(0,0,w,h);
+  gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.disable(gl.BLEND);
+  gl.useProgram(prog);
+  gl.uniformMatrix4fv(U.mv,false,Mat); gl.uniformMatrix4fv(U.mvp,false,mul(P,Mat));
+  gl.uniform1f(U.plano,1);  /* Mat ja vem do ultimo quadro, com o recuo junto */ gl.uniform1f(U.atenua,1); gl.uniform1f(U.corte,0);
+  for(var i=0;i<cena.pecas.length;i++){
+    var pc=cena.pecas[i], d=deslocDe(pc), id=i+1;
+    ligarAtributos(pc.parte);
+    gl.uniform3f(U.desloc,d[0],d[1],d[2]);
+    gl.uniform3f(U.corPlana,(id&255)/255,((id>>8)&255)/255,((id>>16)&255)/255);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,pc.bIdx);
+    gl.drawElements(gl.TRIANGLES,pc.idx.length,pc.parte.tipoIdx,0);
+  }
+  var px4=new Uint8Array(4);
+  gl.readPixels(x,y,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px4);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  gl.uniform1f(U.plano,0);
+  medir(); fundoGl();
+  var id2=px4[0]|(px4[1]<<8)|(px4[2]<<16);
+  return (id2>0 && id2<=cena.pecas.length)?(id2-1):-1;
+}
+function mostrarPeca(){
+  if(!cena){ elPeca.textContent=""; return; }
+  if(selecao<0){
+    var n=soltas();
+    elPeca.textContent=cena.pecas.length<2 ? "peça única"
+      : (n ? n+" de "+cena.pecas.length+" peças soltas · clique para recolher"
+           : cena.pecas.length+" peças · clique numa para selecionar");
+    return;
+  }
+  var pc=cena.pecas[selecao];
+  elPeca.textContent="peça "+(selecao+1)+" de "+cena.pecas.length+
+    " · "+pc.triangulos.toLocaleString("pt-BR")+" triângulos · clique de novo ou Esc desmarca";
+}
+
+var tAnt=performance.now(), giroAcum=0;
+function quadro(){
+  requestAnimationFrame(quadro);
+  var agora=performance.now(), dt=Math.min((agora-tAnt)/1000,.1); tAnt=agora;
+  if(girando && !arrast) girarTela(0,dt*.3,0);    /* so com a barra de espaco */
+  fator+=(fatorAlvo-fator)*Math.min(1,dt*7);     /* desmonta macio */
+  var maiorSolta=0;
+  if(cena){
+    for(var q=0;q<cena.pecas.length;q++){
+      var pq=cena.pecas[q];
+      pq.f+=((pq.alvo||0)-pq.f)*Math.min(1,dt*6);
+      /* peca solta pela mao volta ao lugar, macio */
+      if(pq.puxa && !pq.segura && !pq.fixa){
+        var vv=Math.min(1,dt*5);
+        pq.puxa[0]-=pq.puxa[0]*vv; pq.puxa[1]-=pq.puxa[1]*vv; pq.puxa[2]-=pq.puxa[2]*vv;
+        if(Math.abs(pq.puxa[0])+Math.abs(pq.puxa[1])+Math.abs(pq.puxa[2])<1e-4*cena.raio) pq.puxa=null;
+      }
+      if(pq.f>maiorSolta) maiorSolta=pq.f;
+    }
+  }
+  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  if(!cena) return;
+
+  if(holo){ gl.disable(gl.DEPTH_TEST); gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA,gl.ONE); }
+  else    { gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.disable(gl.BLEND); }
+
+  var c=cena.centro, k=cena.escala;
+  /* desmontando, o conjunto fica maior: a camera recua junto, senao as
+     pecas saem do quadro justo quando ele quer olhar para elas */
+  var distEf=dist*(1+Math.max(fator, maiorSolta*0.42)*0.62);
+  Mat=mul(trans(pan[0],pan[1],-distEf),
+      mul(orient,
+      mul(escala(k,k,k), trans(-c[0],-c[1],-c[2]))));
+  gl.useProgram(prog);
+  gl.uniformMatrix4fv(U.mv,false,Mat);
+  gl.uniformMatrix4fv(U.mvp,false,mul(P,Mat));
+  gl.uniform1f(U.holo,holo?1:0);
+  gl.uniform1f(U.claro,(claro&&!holo)?1:0);
+  gl.uniform1f(U.plano,0);
+  gl.uniform1i(U.mapa,0); gl.uniform1i(U.mapaEmis,1);
+
+  for(var i=0;i<cena.pecas.length;i++){
+    var pc=cena.pecas[i], p=pc.parte, d=deslocDe(pc);
+    ligarAtributos(p);
+    gl.uniform3f(U.desloc,d[0],d[1],d[2]);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,p.tex||branca);
+    gl.uniform1f(U.temMapa,p.tex?1:0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,p.texE||branca);
+    gl.uniform1f(U.temEmis,p.texE?1:0);
+    gl.uniform3f(U.corEmis,p.emis[0]||0,p.emis[1]||0,p.emis[2]||0);
+    gl.uniform4f(U.corBase,p.cor[0],p.cor[1],p.cor[2],p.cor[3]===undefined?1:p.cor[3]);
+    gl.uniform1f(U.corte,p.corte);
+    gl.uniform1f(U.atenua,(selecao<0||selecao===i)?1:0.12);
+
+    if(holo){
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,pc.bIdx);
+      gl.uniform1f(U.forca,.30); gl.drawElements(gl.TRIANGLES,pc.idx.length,p.tipoIdx,0);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,pc.bLin);
+      gl.uniform1f(U.forca,.22); gl.drawElements(gl.LINES,pc.nLin,p.tipoIdx,0);
+    }else{
+      gl.uniform1f(U.forca,1);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,pc.bIdx);
+      gl.drawElements(gl.TRIANGLES,pc.idx.length,p.tipoIdx,0);
+    }
+  }
+}
+requestAnimationFrame(quadro);
+
+/* ============================ carregamento ============================ */
+function qs(n){ return new URLSearchParams(location.search).get(n)||""; }
+
+/* ===== Galeria: a porta de entrada do Holograma 3D =====
+   Gustavo (14/11/2026): aberta sem modelo escolhido, esta tela lista tudo
+   que ja foi baixado para ~/.openjarvis/modelos — e so clicar. Cada modelo
+   novo que o Jarvis baixa aparece aqui sozinho. Nome e descricao vem de
+   fora (Poly Pizza), entao entram como TEXTO, nunca como HTML. */
+function esc(t){
+  return String(t==null?"":t).replace(/[&<>"']/g,function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+  });
+}
+async function mostrarGaleria(){
+  document.title="Jarvis — Holograma 3D";
+  var lista=[];
+  try{
+    var d=await fetch("/api/modelos",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; });
+    lista=(d&&d.modelos)||[];
+  }catch(e){}
+  if(!lista.length){
+    avisar("Nenhum modelo baixado ainda. Peca ao Jarvis: <b>busca um modelo de caminhonete</b>.");
+    return;
+  }
+  var h='<p style="font-size:10px;letter-spacing:.2em;text-transform:uppercase;opacity:.7;margin:0 0 12px">'
+       +'Holograma 3D · '+lista.length+(lista.length===1?' modelo':' modelos')+'</p>'
+       +'<div style="display:grid;gap:8px;text-align:left;max-height:62vh;overflow:auto">';
+  lista.forEach(function(x){
+    var mb=x.bytes?(x.bytes/1048576).toFixed(1).replace(".",",")+" MB":"";
+    h+='<a href="/modelo.html?m='+encodeURIComponent(x.id)+'" style="display:block;padding:11px 14px;'
+      +'border:1px solid rgba(110,170,220,.4);text-decoration:none;color:inherit">'
+      +'<b style="font-size:13.5px">'+esc(x.nome||x.id)+'</b>'
+      +'<span style="float:right;font-size:10.5px;opacity:.6">'+esc(mb)+'</span><br>'
+      +'<span style="font-size:11.5px;opacity:.75">'+esc(String(x.descricao||"").slice(0,90))+'</span></a>';
+  });
+  h+='</div><p style="font-size:11px;opacity:.6;margin:12px 0 0">Para trazer um novo, peça ao Jarvis: '
+    +'<b>busca um modelo de…</b></p>';
+  avisar(h);
+}
+
+async function carregar(){
+  var id=qs("m");
+  if(!id){ mostrarGaleria(); return; }
+  estado("buscando…");
+  var meta=null;
+  try{
+    meta=await fetch("/api/modelos/"+encodeURIComponent(id)).then(function(r){
+      if(!r.ok) throw new Error("HTTP "+r.status); return r.json();
+    });
+  }catch(e){
+    avisar("Nao achei esse modelo aqui. Peca ao Jarvis para <b>baixar</b> antes de mostrar."); return;
+  }
+  document.getElementById("f-nome").textContent=meta.nome||id;
+  document.getElementById("f-desc").textContent=meta.descricao||"";
+  document.getElementById("f-lic").textContent=meta.licenca||"";
+  ficha.hidden=false;
+  document.title="Jarvis — "+(meta.nome||id);
+
+  estado("abrindo o arquivo…");
+  try{
+    var buf=await fetch("/api/modelos/"+encodeURIComponent(id)+"/arquivo")
+      .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.arrayBuffer(); });
+    var lido=abrirGLB(buf);
+    var dados=montarPartes(lido.g,lido.bin);
+    estado("carregando texturas…");
+    cena=await prepararCena(lido.g,lido.bin,dados);
+    var comTex=cena.partes.filter(function(p){return !!p.tex;}).length;
+    estado(cena.triangulos.toLocaleString("pt-BR")+" triângulos<br>"+
+           (comTex?"com textura do arquivo":"sem textura no arquivo"));
+    mostrarPeca();
+  }catch(e){
+    avisar(String(e.message||e));
+  }
+}
+carregar();
+})();
+</script>
+<script>
+/* ===== A tela executa o que o Jarvis pediu =====
+   Gustavo (12/11/2026): o servidor nao consegue abrir uma aba de navegador
+   — `webbrowser.open` devolvia True e nada acontecia. Em vez de o servidor
+   sair criando processos para conseguir, o sentido se inverteu: a
+   ferramenta deixa um pedido em /api/acao e esta pagina, que ja esta
+   aberta, executa. Quem sabe abrir aba de navegador e o navegador.
+   Pedido vale 90s no servidor e e consumido por quem ler primeiro. */
+(function(){
+  "use strict";
+  function atalho(url,rotulo){
+    var d=document.getElementById("jarvis-atalho");
+    if(!d){
+      d=document.createElement("a");
+      d.id="jarvis-atalho"; d.target="_blank"; d.rel="noopener noreferrer";
+      d.style.cssText="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);"+
+        "z-index:9999;padding:11px 18px;background:#0b1118;color:#6fe3f2;"+
+        "border:1px solid #6fe3f2;font:600 12px/1 ui-monospace,Consolas,monospace;"+
+        "letter-spacing:.14em;text-transform:uppercase;text-decoration:none;"+
+        "box-shadow:0 12px 44px -18px #6fe3f2";
+      document.body.appendChild(d);
+    }
+    d.href=url;
+    d.textContent="Abrir "+(rotulo||"pagina")+" →";
+    if(d._t) clearTimeout(d._t);
+    d._t=setTimeout(function(){ if(d.parentNode) d.parentNode.removeChild(d); },25000);
+  }
+  function olhar(){
+    if(document.hidden) return;
+    fetch("/api/acao",{cache:"no-store"}).then(function(r){
+      return r.ok?r.json():null;
+    }).then(function(a){
+      if(!a||!a.tem||!a.url) return;
+      if(a.tipo==="ir"){ window.location.href=a.url; return; }
+      /* Nada de "noopener" aqui: com ele o window.open devolve nulo mesmo
+         quando abre, e o atalho apareceria junto com a aba. Sem ele da
+         para saber o que aconteceu, e o vinculo e cortado logo depois. */
+      var j=null;
+      try{ j=window.open(a.url,"_blank"); }catch(e){}
+      if(j){ try{ j.opener=null; }catch(e){} }
+      else atalho(a.url,a.rotulo);
+    }).catch(function(){});
+  }
+  setInterval(olhar,1500);
+})();
+</script>
+
+<canvas id="gestoCena" style="position:fixed;inset:0;width:100vw;height:100vh;z-index:38;pointer-events:none"></canvas>
+<div id="gestoHud" hidden style="position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:41;
+  pointer-events:none;text-align:center;font:500 10.5px/1.5 ui-monospace,Consolas,monospace;letter-spacing:.22em;
+  text-transform:uppercase;color:#8fe6ff;text-shadow:0 0 10px rgba(80,210,255,.8)">
+  <span id="gestoSensor" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#46e0ff;
+    box-shadow:0 0 10px #46e0ff;margin-right:9px;vertical-align:1px"></span><span id="gestoEstado">ligando sensor…</span>
+</div>
+<div id="gestoCalib" hidden style="position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:42;
+  pointer-events:none;text-align:center;color:#dff8ff;text-shadow:0 0 18px rgba(80,210,255,.9);
+  font:600 22px/1.4 ui-monospace,Consolas,monospace;letter-spacing:.08em;max-width:80vw"></div>
+<video id="gestoVideo" playsinline muted style="position:fixed;left:-9999px;top:0;width:320px;height:240px"></video>
+<script type="module">
+/* ===== Gestos no holograma — versao 4 (16/11, 03h48: mao aberta gira,
+   mao fechada arrasta). O texto abaixo descreve a versao 3; o que mudou
+   esta comentado no inicio do bloco UMA MAO. =====
+   Na versao 2 o Gustavo mexia a mao e o holograma nao acompanhava: girar
+   so funcionava com o PUNHO FORA do modelo, e como o modelo ocupa o meio da
+   tela o punho quase sempre caia numa peca e ia puxar a peca. Ele pediu o
+   padrao das ferramentas de gesto premium. O que ficou, no mesmo espirito
+   delas (direto, um gesto por funcao, nada acontece sem "segurar"):
+
+   MAO FECHADA = SEGURAR O OBJETO. Enquanto a mao esta fechada, o holograma
+     fica preso a ela: GIRA JUNTO COM O PULSO, na mesma direcao e no mesmo
+     tanto (um pouco ampliado, porque o pulso nao da uma volta inteira), e
+     arrastar a mao gira para os lados e para cima/baixo. Em QUALQUER lugar
+     da tela. Abriu a mao, ele fica parado ali.
+   PINCA = DEDO DE PRECISAO.
+     - pinca rapida (fecha e abre) sobre uma peca: SELECIONA;
+     - pinca segurada sobre uma peca e puxando: ARRANCA aquela peca, que
+       vem junto com os dedos; soltou, ela volta ao lugar;
+   DUAS MAOS ABERTAS = afastar EXPLODE tudo, juntar remonta; torcer as duas
+     como um volante gira de lado.
+   MAO ABERTA = nada. So aparece o holograma da mao.
+
+   O giro com o pulso usa a posicao 3D da mao em metros que o detector da
+   (worldLandmarks): pulso, base do indicador e base do mindinho formam um
+   "esquadro"; a diferenca entre o esquadro de agora e o do quadro anterior
+   e exatamente quanto a mao girou, e esse giro e aplicado ao objeto.
+
+   A imagem da camera nao sai do computador: nada vai ao servidor nem a
+   internet, nem e gravado. A camera liga e desliga no botao Gestos. */
+const botao=document.getElementById("bGestos");
+const hud=document.getElementById("gestoHud");
+const elEstado=document.getElementById("gestoEstado");
+const video=document.getElementById("gestoVideo");
+const tela=document.getElementById("gestoCena");
+const g2=tela.getContext("2d");
+let detector=null, fluxo=null, ligado=false, quadro=0, tCam=0;
+
+function dizer(t){ elEstado.textContent=t; }
+function d2(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+
+/* ---------- filtro 1-Euro: parado fica parado, rapido fica rapido ---------- */
+function umEuro(minCorte, beta){
+  let xA=null, dxA=0, tA=0;
+  const alfa=(corte,dt)=>{ const r=2*Math.PI*corte*dt; return r/(r+1); };
+  return function(x,t){
+    if(xA===null){ xA=x; tA=t; return x; }
+    const dt=Math.max(1e-3,(t-tA)/1000); tA=t;
+    const dx=(x-xA)/dt; dxA=dxA+alfa(1,dt)*(dx-dxA);
+    const c=minCorte+beta*Math.abs(dxA);
+    xA=xA+alfa(c,dt)*(x-xA); return xA;
+  };
+}
+const filtros={};
+function filtro(chave){ return filtros[chave]||(filtros[chave]=umEuro(1.4,0.9)); }
+function limparFiltros(){ for(const k in filtros) delete filtros[k]; }
+
+/* camera -> tela: o miolo do quadro cobre a tela inteira e e espelhado */
+function tx(x){ return Math.max(0,Math.min(1,((1-x)-0.12)/0.76)); }
+function ty(y){ return Math.max(0,Math.min(1,(y-0.10)/0.76)); }
+
+/* ---------- leitura de uma mao ---------- */
+/* esquadro da mao no espaco da TELA (x direita, y cima, z para fora) */
+function esquadro(w, chave, t){
+  if(!w) return null;
+  const V=i=>[-w[i].x, -w[i].y, w[i].z];
+  const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+  const nor=a=>{ const n=Math.hypot(a[0],a[1],a[2])||1e-9; return [a[0]/n,a[1]/n,a[2]/n]; };
+  const cru=(a,b)=>[a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+  const f=(v,k)=>v.map((c,i)=>filtro(chave+k+i)(c,t));
+  const a=nor(f(sub(V(5),V(0)),"ea")), b=nor(f(sub(V(17),V(0)),"eb"));
+  const n=nor(cru(a,b)), y=nor(cru(n,a));
+  return [a,y,n];                      /* colunas: x, y, z da mao */
+}
+/* quanto a mao girou de E0 para E1: eixo (na tela) e angulo */
+function giroEntre(E0,E1){
+  /* D = E1 * E0^T */
+  const D=[[0,0,0],[0,0,0],[0,0,0]];
+  for(let r=0;r<3;r++) for(let c=0;c<3;c++){
+    let s=0; for(let k=0;k<3;k++) s+=E1[k][r]*E0[k][c]; D[r][c]=s;
+  }
+  const tr=D[0][0]+D[1][1]+D[2][2];
+  const ang=Math.acos(Math.max(-1,Math.min(1,(tr-1)/2)));
+  if(ang<1e-4) return null;
+  const s2=2*Math.sin(ang);
+  const eixo=[(D[2][1]-D[1][2])/s2,(D[0][2]-D[2][0])/s2,(D[1][0]-D[0][1])/s2];
+  return {eixo, ang};
+}
+/* ===== Limites da mao — calibraveis (16/11) =====
+   Antes eram numeros fixos, chutados sem ver a mao do Gustavo. O botao
+   "Calibrar mao" mede a mao dele (aberta, fechada, pinca) e troca estes
+   valores pelos dele; ficam guardados no servidor. */
+/* Valores de fabrica mais baixos (16/11, 04h): no primeiro teste real a mao
+   aberta do Gustavo ficava presa em "mira" — com polegar perto do indicador
+   a medida 3D dava menos que 0,62 — e por isso o objeto nunca girava. */
+const LIM={dedos:[1,1,1,1], pinca:0.22, pincaAbre:0.40, mira:0.40};
+let calibrado=false;
+/* 17/11: a calibracao saiu (nao ajudava). Valem sempre os valores de
+   fabrica, que servem para qualquer mao: dedo dobrado = ponta mais perto do
+   pulso que a junta do meio. */
+const PONTAS=[[8,6],[12,10],[16,14],[20,18]];
+/* medidas que nao dependem da distancia ate a camera: usa o 3D em metros
+   quando o detector da, senao o 2D */
+function medidas(m,w){
+  const P=w||m, d3=(a,b)=>Math.hypot(P[a].x-P[b].x,P[a].y-P[b].y,(P[a].z||0)-(P[b].z||0));
+  const palma=d3(0,9)||1e-6;
+  return { dedos:PONTAS.map(([p,j])=>d3(p,0)/(d3(j,0)||1e-6)), abertura:d3(4,8)/palma };
+}
+function leitura(m, antes, chave, t, w){
+  const med=medidas(m,w);
+  const dob=med.dedos.map((r,k)=>r<LIM.dedos[k]);
+  const dobrados=dob.filter(Boolean).length;
+  let forma=antes||"aberta";
+  if(dobrados>=3) forma="punho"; else if(dobrados<=1) forma="aberta";
+  const palma=d2(m[0],m[9])||1e-6;
+  const pts=m.map((p,i)=>({x:filtro(chave+"x"+i)(tx(p.x),t), y:filtro(chave+"y"+i)(ty(p.y),t)}));
+  return { forma, abertura:med.abertura, med, pts,
+           cx:(pts[0].x+pts[9].x)/2, cy:(pts[0].y+pts[9].y)/2,
+           px:(pts[4].x+pts[8].x)/2, py:(pts[4].y+pts[8].y)/2 };
+}
+
+/* ---------- desenho do holograma das maos ---------- */
+const OSSOS=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+             [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+let pulsos=[];       /* aneis que se expandem quando a pinca seleciona */
+function medirTela(){
+  const dpr=Math.min(devicePixelRatio||1,2);
+  tela.width=Math.round(innerWidth*dpr); tela.height=Math.round(innerHeight*dpr);
+  g2.setTransform(dpr,0,0,dpr,0,0);
+}
+addEventListener("resize",medirTela); medirTela();
+function brilho(cor,raio){ g2.shadowColor=cor; g2.shadowBlur=raio; }
+function desenharMao(h, estado, forca){
+  const W=innerWidth, H=innerHeight, P=h.pts.map(p=>({x:p.x*W,y:p.y*H}));
+  const a=0.35+0.65*forca;
+  g2.lineCap="round";
+  /* palma translucida */
+  g2.beginPath(); [0,1,5,9,13,17].forEach((i,k)=>k?g2.lineTo(P[i].x,P[i].y):g2.moveTo(P[i].x,P[i].y));
+  g2.closePath(); g2.fillStyle=`rgba(70,200,255,${estado==="agarra"?0.20:0.06})`; g2.fill();
+  /* ossos */
+  brilho("rgba(70,210,255,.95)",14);
+  g2.strokeStyle=`rgba(120,225,255,${a})`; g2.lineWidth=estado==="agarra"?2.6:1.5;
+  g2.beginPath(); OSSOS.forEach(([i,j])=>{ g2.moveTo(P[i].x,P[i].y); g2.lineTo(P[j].x,P[j].y); }); g2.stroke();
+  /* juntas; pontas dos dedos mais fortes */
+  P.forEach((p,i)=>{
+    const ponta=(i===4||i===8||i===12||i===16||i===20);
+    g2.beginPath(); g2.arc(p.x,p.y,ponta?3.4:2,0,Math.PI*2);
+    g2.fillStyle=ponta?"rgba(220,250,255,.95)":`rgba(140,230,255,${a})`; g2.fill();
+  });
+  g2.shadowBlur=0;
+  /* postura de pinca: anel que fecha com os dedos */
+  if(estado==="mira"||estado==="pinca"){
+    const r=Math.max(7,Math.min(34,h.abertura*46));
+    const x=h.px*W, y=h.py*H;
+    brilho("rgba(90,220,255,1)",18);
+    g2.strokeStyle=estado==="pinca"?"rgba(235,252,255,1)":"rgba(140,232,255,.9)";
+    g2.lineWidth=estado==="pinca"?2.6:1.4;
+    g2.beginPath(); g2.arc(x,y,r,0,Math.PI*2); g2.stroke();
+    for(let k=0;k<4;k++){                       /* marcas de mira */
+      const ang=k*Math.PI/2+performance.now()/900;
+      g2.beginPath(); g2.moveTo(x+Math.cos(ang)*(r+5),y+Math.sin(ang)*(r+5));
+      g2.lineTo(x+Math.cos(ang)*(r+11),y+Math.sin(ang)*(r+11)); g2.stroke();
+    }
+    g2.shadowBlur=0;
+  }
+  /* agarrando: aro pulsando em volta da palma */
+  if(estado==="agarra"){
+    const x=h.cx*W, y=h.cy*H, r=34+Math.sin(performance.now()/120)*3;
+    brilho("rgba(90,220,255,1)",22);
+    g2.strokeStyle="rgba(200,245,255,.95)"; g2.lineWidth=2;
+    g2.beginPath(); g2.arc(x,y,r,0,Math.PI*2); g2.stroke();
+    g2.setLineDash([4,7]); g2.beginPath(); g2.arc(x,y,r+9,0,Math.PI*2); g2.stroke(); g2.setLineDash([]);
+    g2.shadowBlur=0;
+  }
+}
+function desenharPonte(a,b,f){
+  const W=innerWidth,H=innerHeight;
+  const x1=a.cx*W,y1=a.cy*H,x2=b.cx*W,y2=b.cy*H;
+  brilho("rgba(90,220,255,1)",16);
+  g2.strokeStyle="rgba(150,235,255,.85)"; g2.lineWidth=1.4; g2.setLineDash([2,8]);
+  g2.beginPath(); g2.moveTo(x1,y1); g2.lineTo(x2,y2); g2.stroke(); g2.setLineDash([]);
+  const mx=(x1+x2)/2, my=(y1+y2)/2;
+  g2.beginPath(); g2.arc(mx,my,18,-Math.PI/2,-Math.PI/2+Math.PI*2*f); g2.lineWidth=2.4;
+  g2.strokeStyle="rgba(230,252,255,.95)"; g2.stroke();
+  g2.shadowBlur=0;
+  g2.fillStyle="rgba(190,245,255,.95)"; g2.font="600 10px ui-monospace,Consolas,monospace";
+  g2.textAlign="center"; g2.fillText(Math.round(f*100)+"%",mx,my+4);
+}
+function desenharPulsos(){
+  const W=innerWidth,H=innerHeight, agora=performance.now();
+  pulsos=pulsos.filter(p=>agora-p.t<650);
+  pulsos.forEach(p=>{
+    const k=(agora-p.t)/650;
+    brilho(p.ok?"rgba(90,220,255,1)":"rgba(255,120,90,1)",18);
+    g2.strokeStyle=p.ok?`rgba(200,248,255,${1-k})`:`rgba(255,150,120,${1-k})`;
+    g2.lineWidth=2; g2.beginPath(); g2.arc(p.x*W,p.y*H,10+k*60,0,Math.PI*2); g2.stroke();
+  });
+  g2.shadowBlur=0;
+}
+
+/* ---------- estado dos gestos ---------- */
+/* ===== Versao 7 (17/11) — "igual ao filme" =====
+   O Gustavo testou a versao 6 e marcou tudo: nao respondia, tremia, girava
+   errado e atrasava. Escolheu o esquema do filme:
+   - MAO FECHADA = AGARRA o holograma. Ele gira junto com a mao, na mesma
+     direcao. Abriu a mao: solta. Soltou com impulso: continua girando e
+     para devagar, como no filme.
+   - Agarrar EM CIMA da peca selecionada: tira aquela peca, que vem junto
+     com a mao e fica onde for largada.
+   - INDICADOR APONTANDO (os outros dedos dobrados) = mira. Segurou a mira
+     parada numa peca, um anel vai fechando, como em video game; fechou,
+     seleciona.
+   - DUAS MAOS FECHADAS: afastar desmonta, juntar monta, torcer gira de lado.
+   - MAO ABERTA = nao faz nada (so mostra a mao). Isso acabou com o objeto
+     girando sozinho quando a mao so passava na frente da camera.
+   Contra tremor e atraso: a forma da mao so troca depois de 2 quadros
+   iguais; movimento menor que o ruido e ignorado; o giro e aplicado a cada
+   quadro da TELA (60 por segundo), nao so quando chega quadro da camera. */
+let formaFirme=null, formaNova=null, nForma=0;
+let pega=null;                 /* {tipo:"gira"|"peca", ...} */
+let duas=null, quadrosDuas=0;
+let inercia={vx:0, vy:0};      /* rad/s que sobram depois de soltar */
+let mira=null;                 /* {i, t0, x, y} para a selecao por espera */
+let rodar=null;                /* mao aberta / dedo girando como um globo */
+let ultimaVez=performance.now();
+const GANHO=3.4;               /* uma largura de tela = ~1 volta e meia */
+const ESPERA_MS=900;           /* tempo segurando a mira para selecionar */
+
+function soltarPega(p, comImpulso){
+  if(!pega) return;
+  if(pega.tipo==="peca") p.soltarPeca(pega.i, true);
+  if(pega.tipo==="gira" && comImpulso){
+    const v=Math.hypot(pega.vx,pega.vy);
+    if(v>0.8){ inercia.vx=pega.vx; inercia.vy=pega.vy; }
+  }
+  pega=null;
+}
+function formaDaMao(m){
+  /* dedo dobrado = ponta mais perto do pulso que a junta do meio */
+  const dob=m.med.dedos.map((r,k)=>r<LIM.dedos[k]);
+  const n=dob.filter(Boolean).length;
+  if(!dob[0] && dob[1] && dob[2] && dob[3]) return "aponta";
+  if(n>=3) return "punho";
+  if(n<=1) return "aberta";
+  return null;              /* meio-termo: mantem a forma anterior */
+}
+function desenharMira(x,y,k,temPeca){
+  const W=innerWidth,H=innerHeight, X=x*W, Y=y*H;
+  brilho("rgba(90,220,255,1)",16);
+  g2.strokeStyle=temPeca?"rgba(200,248,255,.95)":"rgba(140,230,255,.55)"; g2.lineWidth=1.4;
+  g2.beginPath(); g2.arc(X,Y,16,0,Math.PI*2); g2.stroke();
+  for(let q=0;q<4;q++){
+    const a=q*Math.PI/2+performance.now()/700;
+    g2.beginPath(); g2.moveTo(X+Math.cos(a)*20,Y+Math.sin(a)*20); g2.lineTo(X+Math.cos(a)*27,Y+Math.sin(a)*27); g2.stroke();
+  }
+  if(temPeca && k>0){                         /* o anel que vai fechando */
+    g2.strokeStyle="rgba(235,252,255,1)"; g2.lineWidth=3.2;
+    g2.beginPath(); g2.arc(X,Y,16,-Math.PI/2,-Math.PI/2+Math.PI*2*k); g2.stroke();
+  }
+  g2.shadowBlur=0;
+}
+
+function passo(){
+  if(!ligado) return;
+  quadro=requestAnimationFrame(passo);
+  const agoraR=performance.now(), dtR=Math.min(0.05,(agoraR-ultimaVez)/1000); ultimaVez=agoraR;
+  const ponte=window.jarvisGesto;
+  /* impulso depois de soltar: continua girando e freia devagar */
+  if(ponte && !pega && (Math.abs(inercia.vx)+Math.abs(inercia.vy))>0.02){
+    ponte.girar(inercia.vx*dtR, inercia.vy*dtR);
+    const freio=Math.exp(-dtR*1.6); inercia.vx*=freio; inercia.vy*=freio;
+  }
+  if(video.readyState<2) return;
+  const t=performance.now();
+  if(video.currentTime===tCam) return;    /* mesmo quadro da camera: nada novo */
+  tCam=video.currentTime;
+  let r; try{ r=detector.detectForVideo(video,t); }catch(e){ return; }
+  if(!ponte) return;
+  g2.clearRect(0,0,innerWidth,innerHeight);
+  desenharPulsos();
+  const marcas=(r&&r.landmarks)||[];
+  const mundo=(r&&r.worldLandmarks)||[];
+  const lados=((r&&(r.handednesses||r.handedness))||[]).map(h=>(h&&h[0]&&h[0].categoryName)||"?");
+
+  const temDuas=marcas.length>=2 && lados[0]!==lados[1];
+  quadrosDuas=temDuas?quadrosDuas+1:0;
+
+  /* calibracao: as DUAS maos ao mesmo tempo (pedido de 17/11) */
+  if(calib && marcas.length){
+    const ls=marcas.map((mk,k)=>leitura(mk,null,lados[k]||("m"+k),t,mundo[k]));
+    calibrar(ls); ls.forEach(h=>desenharMao(h,"aberta",1)); return;
+  }
+
+  if(!marcas.length){
+    if(rodar && rodar.mexendo && Math.hypot(rodar.vx,rodar.vy)>0.8){ inercia.vx=rodar.vx; inercia.vy=rodar.vy; }
+    rodar=null;
+    soltarPega(ponte,true); duas=null; mira=null; formaFirme=null; nForma=0; limparFiltros();
+    dizer("sensor ativo · mostre a mão");
+    if(calib) elCal.innerHTML=ETAPAS[calib.etapa].txt+"<br><small>mostre a mão para a câmera</small>";
+    return;
+  }
+
+  /* ===== DUAS MAOS FECHADAS: desmontar / montar / torcer ===== */
+  if(quadrosDuas>=3){
+    soltarPega(ponte,false); mira=null;
+    const a=leitura(marcas[0],null,lados[0],t,mundo[0]), b=leitura(marcas[1],null,lados[1],t,mundo[1]);
+    const fa=formaDaMao(a), fb=formaDaMao(b);
+    const agarradas=fa==="punho" && fb==="punho";
+    const sep=Math.hypot(a.cx-b.cx,a.cy-b.cy), ang=Math.atan2(b.cy-a.cy,b.cx-a.cx);
+    let f=ponte.fator();
+    if(agarradas){
+      if(!duas) duas={sep0:sep, f0:f, ang};
+      f=Math.max(0,Math.min(1,duas.f0+(sep-duas.sep0)*1.6));
+      ponte.desmontar(f);
+      let dA=ang-duas.ang; if(dA>Math.PI) dA-=2*Math.PI; if(dA<-Math.PI) dA+=2*Math.PI;
+      if(Math.abs(dA)>0.01) ponte.rolar(-dA);
+      duas.ang=ang;
+      inercia.vx=inercia.vy=0;
+    }else duas=null;
+    desenharPonte(a,b,f);
+    desenharMao(a,agarradas?"agarra":"aberta",1); desenharMao(b,agarradas?"agarra":"aberta",1);
+    dizer(agarradas?"duas mãos · afaste para desmontar, junte para montar · "+Math.round(f*100)+"%"
+                   :"duas mãos · feche as duas para desmontar");
+    return;
+  }
+  duas=null;
+
+  /* ===== UMA MAO ===== */
+  const chave=lados[0]||"m";
+  const m=leitura(marcas[0],null,chave,t,mundo[0]);
+  /* forma so troca depois de 2 quadros iguais (tira o pisca-pisca) */
+  const fAgora=formaDaMao(m);
+  if(fAgora && fAgora!==formaFirme){
+    if(fAgora===formaNova) nForma++; else { formaNova=fAgora; nForma=1; }
+    if(nForma>=2 || formaFirme===null){ formaFirme=fAgora; nForma=0; }
+  }
+  const forma=formaFirme||"aberta";
+
+  /* --- MAO FECHADA: agarra (o objeto inteiro, ou a peca selecionada) --- */
+  if(forma==="punho"){
+    mira=null; rodar=null;
+    if(!pega){
+      inercia.vx=inercia.vy=0;
+      const sel=ponte.selecionada(), sob=ponte.pegarPeca(m.cx,m.cy);
+      if(sel>=0 && sob===sel){ pega={tipo:"peca", i:sel, x:m.cx, y:m.cy}; ponte.focar(sel); }
+      else pega={tipo:"gira", x:m.cx, y:m.cy, t:t, vx:0, vy:0};
+    }
+    let dx=m.cx-pega.x, dy=m.cy-pega.y;
+    const dt=Math.max(0.008,(t-(pega.t||t))/1000);
+    if(Math.abs(dx)<0.0015) dx=0;             /* ruido parado nao gira */
+    if(Math.abs(dy)<0.0015) dy=0;
+    if(dx||dy){
+      if(pega.tipo==="peca") ponte.puxar(pega.i,dx,dy);
+      else{
+        ponte.girar(dx*GANHO, dy*GANHO);
+        /* velocidade para o impulso ao soltar (media movel) */
+        pega.vx=pega.vx*0.6+(dx*GANHO/dt)*0.4; pega.vy=pega.vy*0.6+(dy*GANHO/dt)*0.4;
+      }
+      pega.x=m.cx; pega.y=m.cy;
+    }else if(pega.tipo==="gira"){ pega.vx*=0.7; pega.vy*=0.7; }
+    pega.t=t;
+    desenharMao(m,"agarra",1);
+    dizer(pega.tipo==="peca"?"peça na mão · abra a mão para largar":"agarrado · gire com a mão, abra para soltar");
+    return;
+  }
+  /* abriu ou apontou: solta (com impulso, se estava girando rapido) */
+  if(pega) soltarPega(ponte,true);
+
+  /* --- MAO ABERTA OU DEDO MEXENDO: gira como quem roda um globo (17/11:
+     "tento mexer com os dedos e nao vai"). Parou a mao, para de girar;
+     saiu da camera ou fechou a mao com a mao rapida, continua girando. --- */
+  const ref=forma==="aponta"?m.pts[8]:{x:m.cx,y:m.cy};
+  if(rodar && rodar.forma===forma){
+    let dx=ref.x-rodar.x, dy=ref.y-rodar.y;
+    const dt=Math.max(0.008,(t-rodar.t)/1000);
+    const vel=Math.hypot(dx,dy)/dt;            /* telas por segundo */
+    const mexendo=forma==="aberta" ? vel>0.05 : vel>0.35;   /* apontando precisa ser um gesto claro */
+    if(mexendo){
+      if(Math.abs(dx)<0.0012) dx=0; if(Math.abs(dy)<0.0012) dy=0;
+      if(dx||dy){
+        ponte.girar(dx*GANHO, dy*GANHO);
+        rodar.vx=rodar.vx*0.5+(dx*GANHO/dt)*0.5; rodar.vy=rodar.vy*0.5+(dy*GANHO/dt)*0.5;
+        inercia.vx=inercia.vy=0;
+      }
+      rodar.girou=true;
+    }else{ rodar.vx*=0.5; rodar.vy*=0.5; }
+    rodar.mexendo=mexendo;
+  }else rodar={forma, vx:0, vy:0, girou:false, mexendo:false};
+  rodar.x=ref.x; rodar.y=ref.y; rodar.t=t;
+  if(forma==="aberta"){
+    mira=null;
+    desenharMao(m,"aberta",1);
+    dizer(rodar.mexendo?"girando com a mão":"mão aberta · mexa para girar · feche para agarrar");
+    return;
+  }
+
+  /* --- APONTANDO PARADO: mira; segurar numa peca seleciona --- */
+  if(forma==="aponta" && rodar && rodar.mexendo){ mira=null; desenharMao(m,"mira",0.8); dizer("girando com o dedo"); return; }
+  if(forma==="aponta"){
+    const x=m.pts[8].x, y=m.pts[8].y;
+    const i=ponte.pegarPeca(x,y);
+    if(!mira || mira.i!==i || Math.hypot(x-mira.x,y-mira.y)>0.06){ mira={i, t0:t, x, y, feito:false}; }
+    const k=Math.min(1,(t-mira.t0)/ESPERA_MS);
+    if(i>=0 && k>=1 && !mira.feito){
+      mira.feito=true;
+      if(ponte.selecionada()!==i) ponte.clicar(x,y);
+      pulsos.push({x,y,t:performance.now(),ok:true});
+    }
+    desenharMao(m,"mira",0.8);
+    desenharMira(x,y,mira.feito?1:k,i>=0);
+    dizer(i<0?"mira · aponte para uma peça"
+         :(mira.feito?"peça selecionada · feche a mão sobre ela para tirá-la":"segure a mira na peça…"));
+    return;
+  }
+  mira=null;
+
+  /* --- MAO ABERTA: so mostra a mao --- */
+  desenharMao(m,"aberta",0.7);
+  dizer("mão aberta · feche para agarrar · aponte para selecionar");
+}
+
+/* ===== Calibracao guiada ===== */
+const bCal=document.getElementById("bCalibrar"), elCal=document.getElementById("gestoCalib");
+/* 17/11: as duas maos de uma vez, e so duas etapas (a pinca saiu dos
+   gestos; apontar usa a mesma medida dos dedos). */
+const ETAPAS=[
+  {id:"aberta", txt:"AS DUAS MÃOS ABERTAS<br><small>dedos esticados, paradas, de frente para a câmera</small>"},
+  {id:"punho",  txt:"AS DUAS MÃOS FECHADAS<br><small>feche os dois punhos</small>"}
+];
+let calib=null;
+function mediana(v){ const a=[...v].sort((x,y)=>x-y); return a.length?a[Math.floor(a.length/2)]:NaN; }
+function pct(v,p){ const a=[...v].sort((x,y)=>x-y); return a.length?a[Math.min(a.length-1,Math.floor(a.length*p))]:NaN; }
+function calibrar(m){
+  const e=ETAPAS[calib.etapa], agora=performance.now(), dt=agora-calib.t0;
+  if(dt<1500){ elCal.innerHTML=e.txt+"<br><small>prepare… "+Math.ceil((1500-dt)/1000)+"</small>"; return; }
+  m.forEach(h=>calib.amostras[e.id].push(h.med));
+  elCal.innerHTML=e.txt+"<br><small>medindo "+"●".repeat(Math.min(10,Math.floor((dt-1500)/300)))+"</small>";
+  if(dt>4500){ calib.etapa++; calib.t0=agora; if(calib.etapa>=ETAPAS.length) concluirCalib(); }
+}
+function concluirCalib(){
+  const A=calib.amostras; calib=null;
+  const novo={dedos:LIM.dedos.slice()}; let ok=A.aberta.length>8 && A.punho.length>8, mudou=0;
+  if(ok) for(let k=0;k<4;k++){
+    /* o meio entre a mao aberta mais fechada e o punho mais aberto */
+    const o=pct(A.aberta.map(x=>x.dedos[k]),0.15), f=pct(A.punho.map(x=>x.dedos[k]),0.85);
+    if(o-f>0.08){ novo.dedos[k]=(o+f)/2; mudou++; }
+  }
+  if(mudou<3) ok=false;
+  if(!ok){
+    elCal.innerHTML="NÃO DEU PARA MEDIR<br><small>a mão saiu da câmera ou os gestos ficaram parecidos · tente de novo</small>";
+    setTimeout(()=>{ elCal.hidden=true; },3500); return;
+  }
+  Object.assign(LIM,novo); calibrado=true;
+  fetch("/api/gestos/calibracao",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({limites:LIM, quando:new Date().toISOString(),
+      resumo:{aberta:A.aberta.length,punho:A.punho.length}})}).catch(()=>{});
+  elCal.innerHTML="CALIBRADO<br><small>os gestos agora usam a medida da sua mão</small>";
+  setTimeout(()=>{ elCal.hidden=true; },2500);
+}
+bCal.addEventListener("click",()=>{
+  if(!ligado) return;
+  calib={etapa:0, t0:performance.now(), amostras:{aberta:[],punho:[]}};
+  elCal.hidden=false;
+});
+
+async function ligar(){
+  botao.disabled=true; hud.hidden=false; dizer("ligando sensor…");
+  try{
+    fluxo=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480,facingMode:"user"},audio:false});
+  }catch(e){ dizer("câmera negada ou ausente"); botao.disabled=false; return; }
+  video.srcObject=fluxo; await video.play().catch(()=>{});
+  try{
+    if(!detector){
+      dizer("carregando visão…");
+      const {FilesetResolver, HandLandmarker}=await import("/vendor/mediapipe/vision_bundle.mjs");
+      const base=await FilesetResolver.forVisionTasks("/vendor/mediapipe/wasm");
+      const opc=onde=>({ baseOptions:{modelAssetPath:"/vendor/mediapipe/hand_landmarker.task", delegate:onde},
+        runningMode:"VIDEO", numHands:2, minHandDetectionConfidence:.6, minHandPresenceConfidence:.6, minTrackingConfidence:.55 });
+      try{ detector=await HandLandmarker.createFromOptions(base,opc("GPU")); }
+      catch(e){ detector=await HandLandmarker.createFromOptions(base,opc("CPU")); }
+    }
+  }catch(e){ dizer("visão não carregou"); desligar(); botao.disabled=false; return; }
+  /* o visual do filme: liga o modo holograma junto */
+  const bModo=document.getElementById("bModo");
+  if(bModo && !bModo.classList.contains("lig")) bModo.click();
+  ligado=true; botao.textContent="Gestos ligados"; botao.classList.add("lig"); botao.disabled=false;
+  dizer("sensor ativo · mostre a mão"); passo();
+  /* primeira vez com gestos: mede a mao antes de tudo */
+  /* 17/11: a calibracao nao abre mais sozinha — os valores de fabrica ja
+     servem para fechar/abrir/apontar; o botao fica para quem quiser. */
+}
+function desligar(){
+  ligado=false; cancelAnimationFrame(quadro);
+  const p=window.jarvisGesto; if(p) soltarPega(p,false);
+  if(fluxo){ fluxo.getTracks().forEach(t=>t.stop()); fluxo=null; }
+  video.srcObject=null; hud.hidden=true; g2.clearRect(0,0,innerWidth,innerHeight);
+  botao.textContent="Gestos"; botao.classList.remove("lig"); bCal.hidden=true; calib=null; elCal.hidden=true;
+  formaFirme=null; nForma=0; mira=null; duas=null; quadrosDuas=0; inercia={vx:0,vy:0}; limparFiltros();
+}
+botao.addEventListener("click",()=>{ if(ligado) desligar(); else ligar(); });
+addEventListener("pagehide",desligar);
+window.jarvisGestoTeste=async function(){
+  const {FilesetResolver, HandLandmarker}=await import("/vendor/mediapipe/vision_bundle.mjs");
+  const base=await FilesetResolver.forVisionTasks("/vendor/mediapipe/wasm");
+  const d=await HandLandmarker.createFromOptions(base,{baseOptions:{modelAssetPath:"/vendor/mediapipe/hand_landmarker.task",delegate:"CPU"},runningMode:"VIDEO",numHands:2});
+  d.close(); return "detector ok";
+};
+</script>
+</body>
+</html>

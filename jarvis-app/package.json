@@ -1,0 +1,13 @@
+{
+  "name": "jarvis-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Janela propria do Jarvis, com navegador embutido na tela",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "33.2.1"
+  }
+}

@@ -1,0 +1,2176 @@
+<title>Jarvis — Briefing</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+
+<style>
+/* Tela de espera da fechadura. Fica aqui no topo, junto com o script abaixo,
+   para valer ANTES de a interface ser desenhada: em 14/11 a interface
+   aparecia inteira por um instante e so depois travava. */
+.travado #topo, .travado .coluna, .travado #menu, .travado #rodape,
+.travado #escrita, .travado #progresso, .travado #frase{visibility:hidden}
+</style>
+<script>
+/* A tela NASCE TRAVADA, sempre — menos quando este navegador ja sabe, com
+   certeza, que nao ha fechadura ("0"). Em 15/11 ela esperava o servidor
+   responder para so entao travar; com o servidor ocupado na subida, a
+   interface ficava uns 10 segundos a mostra antes da identificacao. Agora a
+   ordem e a certa: primeiro a espera, depois a interface. */
+try{ if(localStorage.getItem("jarvis-tranca")!=="0") document.documentElement.classList.add("travado"); }catch(e){ document.documentElement.classList.add("travado"); }
+</script>
+<!-- So no app proprio (Jarvis.exe): voz local (Whisper + Kokoro) e o
+     navegador dentro da tela. No Edge os dois arquivos nao fazem nada. -->
+<script src="/voz-local.js"></script>
+<script src="/navegador-painel.js"></script>
+
+<style>
+/* Azul frio dominante, gelo nos destaques. Tema unico — e noite. */
+:root{
+  --vazio:#03060e;
+  --ciano:#6fe3f2;
+  --ciano-f:rgba(111,227,242,.30);
+  --gelo:#d6f3ff;
+  --azul:#3f9fe8;
+  --tinta:#e4eef8;
+  --tinta-f:#78899c;
+  --display:"Segoe UI Semibold","Segoe UI",Inter,system-ui,sans-serif;
+  --texto:"Segoe UI",Inter,system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:
+    radial-gradient(ellipse 66% 72% at 50% 50%, rgba(41,124,226,.17) 0%, transparent 62%),
+    radial-gradient(ellipse 125% 95% at 50% 50%, rgba(10,32,74,.55) 0%, transparent 74%),
+    var(--vazio);
+  color:var(--tinta);font-family:var(--texto);overflow:hidden;
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.6;
+  background-image:
+    linear-gradient(rgba(111,227,242,.048) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(111,227,242,.048) 1px,transparent 1px);
+  background-size:62px 62px;
+  mask-image:radial-gradient(ellipse 88% 88% at 50% 50%,#000 6%,transparent 76%);
+  -webkit-mask-image:radial-gradient(ellipse 88% 88% at 50% 50%,#000 6%,transparent 76%);
+}
+
+#moldura{
+  position:fixed;z-index:6;pointer-events:none;
+  inset:max(13px,env(safe-area-inset-top,0px)) max(13px,env(safe-area-inset-right,0px)) max(13px,env(safe-area-inset-bottom,0px)) max(13px,env(safe-area-inset-left,0px));
+  border:1px solid rgba(111,227,242,.10);
+}
+#moldura i{position:absolute;width:24px;height:24px;border:1px solid var(--ciano);opacity:.75}
+#moldura i:nth-child(1){top:-1px;left:-1px;border-right:0;border-bottom:0}
+#moldura i:nth-child(2){top:-1px;right:-1px;border-left:0;border-bottom:0}
+#moldura i:nth-child(3){bottom:-1px;left:-1px;border-right:0;border-top:0}
+#moldura i:nth-child(4){bottom:-1px;right:-1px;border-left:0;border-top:0}
+
+#fios{position:fixed;inset:0;z-index:1;pointer-events:none}
+
+#tela{
+  position:relative;z-index:2;height:100%;display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(300px,1fr) minmax(0,1fr);
+  grid-template-rows:auto minmax(0,1fr) auto auto;
+  column-gap:clamp(12px,2.6vw,40px);row-gap:10px;
+  padding:max(28px,env(safe-area-inset-top,0px)) max(28px,env(safe-area-inset-right,0px)) max(24px,env(safe-area-inset-bottom,0px)) max(28px,env(safe-area-inset-left,0px));
+}
+
+/* ---------------------------------------------------------- topo */
+#topo{grid-column:1/-1;grid-row:1;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+#hora{
+  font-family:var(--display);font-weight:700;font-size:clamp(28px,4.2vw,50px);
+  line-height:.95;font-variant-numeric:tabular-nums;color:var(--gelo);
+  text-shadow:0 0 34px rgba(111,227,242,.45);
+}
+#hora small{font-size:.4em;font-weight:500;color:var(--tinta-f);margin-left:.38em;letter-spacing:.1em}
+#data{font-size:11px;color:var(--tinta-f);letter-spacing:.055em;text-transform:uppercase;font-family:var(--display)}
+#estado{
+  margin-left:auto;display:flex;align-items:center;gap:8px;
+  font-family:var(--display);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ciano);
+}
+#led{width:6px;height:6px;border-radius:50%;background:var(--ciano);box-shadow:0 0 12px var(--ciano)}
+body.falando #led{animation:bate .85s ease-in-out infinite}
+@keyframes bate{50%{opacity:.2;transform:scale(.65)}}
+
+/* ------------------------------------------------------- colunas */
+.coluna{grid-row:2;display:flex;flex-direction:column;justify-content:center;gap:clamp(9px,1.5vh,18px);min-width:0}
+#esq{grid-column:1}
+#dir{grid-column:3}
+#dir .cartao{border-left:0;border-right:1px solid var(--ciano-f);text-align:right;
+  background:linear-gradient(270deg,rgba(7,18,36,.78),rgba(7,18,36,.1))}
+#dir .rot{flex-direction:row-reverse}
+#dir .ticks{justify-content:flex-end}
+
+.cartao{
+  position:relative;border-left:1px solid var(--ciano-f);
+  background:linear-gradient(90deg,rgba(7,18,36,.78),rgba(7,18,36,.1));
+  padding:10px 14px;opacity:.15;transition:opacity .55s ease,border-color .55s ease;min-width:0;
+}
+.cartao.ativo{opacity:1;border-color:var(--ciano);box-shadow:-14px 0 30px -22px var(--ciano)}
+#dir .cartao.ativo{box-shadow:14px 0 30px -22px var(--ciano)}
+.cartao.ativo .val,.cartao.ativo .sub{animation:entra .6s cubic-bezier(.2,.8,.2,1) both}
+.cartao.ativo .sub{animation-delay:.08s}
+@keyframes entra{from{opacity:0;transform:translateY(6px);clip-path:inset(0 100% 0 0)}
+  to{opacity:1;transform:none;clip-path:inset(0 0 0 0)}}
+
+.rot{display:flex;align-items:center;gap:7px;margin:0 0 3px;
+  font-family:var(--display);font-size:8.5px;font-weight:500;
+  letter-spacing:.21em;text-transform:uppercase;color:var(--ciano)}
+.rot i{font-style:normal;opacity:.5;font-variant-numeric:tabular-nums}
+.rot::after{content:"";flex:1;height:1px;background:var(--ciano-f)}
+.ticks{display:flex;align-items:flex-end;gap:2px;margin:0 0 7px;height:4px;opacity:.45}
+.ticks span{width:1px;background:var(--ciano)}
+.val{margin:0;font-family:var(--display);font-weight:600;
+  font-size:clamp(15px,1.7vw,20px);line-height:1.2;color:var(--tinta)}
+.val b{font-weight:700;color:var(--gelo)}
+.sub{margin:4px 0 0;font-size:11px;line-height:1.5;color:var(--tinta-f)}
+.cartao.vazio .val{color:var(--tinta-f);font-weight:400;font-size:clamp(13px,1.4vw,15px)}
+
+/* -------------------------------------------------------- reator */
+.cartao.clicavel{cursor:pointer}
+.cartao.clicavel:hover,.cartao.clicavel:focus-visible{outline:0}
+.cartao.clicavel:hover .n,.cartao.clicavel:focus-visible .n{color:var(--ciano)}
+.cartao.clicavel::after{content:"";position:absolute;left:0;bottom:-1px;height:1px;
+  width:0;background:var(--ciano);transition:width .25s}
+.cartao.clicavel:hover::after,.cartao.clicavel:focus-visible::after{width:100%}
+#progresso{width:min(430px,78%);height:1px;margin:16px auto 0;
+  background:rgba(111,227,242,.16);opacity:0;transition:opacity .35s}
+#progresso.vivo{opacity:1}
+#progresso i{display:block;height:100%;width:0;background:var(--ciano);
+  box-shadow:0 0 8px rgba(111,227,242,.8);transition:width .35s ease-out}
+#escrita{display:flex;gap:8px;align-items:center;margin:18px auto 0;
+  max-width:min(430px,78%);border-bottom:1px solid rgba(111,227,242,.22);
+  padding-bottom:5px;transition:border-color .2s}
+#escrita:focus-within{border-bottom-color:var(--ciano)}
+#campo{flex:1;background:transparent;border:0;outline:0;color:var(--tinta);
+  font-family:inherit;font-size:13px;padding:4px 2px}
+#campo::placeholder{color:var(--tinta-f);opacity:.65}
+#enviar{background:transparent;border:0;cursor:pointer;color:var(--tinta-f);
+  font-size:14px;line-height:1;padding:3px 5px;transition:.18s}
+#enviar:hover{color:var(--ciano)}
+#centro{grid-column:2;grid-row:2;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:8px;min-width:0;min-height:0;overflow:hidden}
+#reator{width:min(100%,clamp(200px,42vh,520px));aspect-ratio:1;position:relative;flex:0 0 auto}
+#reator canvas{width:100%;height:100%;display:block}
+
+#rotulo{font-family:var(--display);font-size:10px;font-weight:500;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--ciano);text-align:center;min-height:1.2em;
+  transition:font-size .3s,letter-spacing .3s,color .3s}
+#rotulo.marca{font-size:clamp(14px,1.6vw,19px);font-weight:600;letter-spacing:.46em;
+  color:var(--gelo);text-indent:.46em;text-shadow:0 0 28px rgba(111,227,242,.6)}
+#frase{font-size:12.5px;color:var(--tinta);text-align:center;max-width:52ch;
+  line-height:1.65;min-height:3.4em;margin:0;transition:opacity .35s}
+#saudacao{display:block;font-family:var(--display);font-size:15px;font-weight:600;
+  color:var(--gelo);letter-spacing:.01em;margin-bottom:4px;
+  text-shadow:0 0 22px rgba(111,227,242,.4)}
+
+/* -------------------------------------------------------- rodape */
+#rodape{grid-column:1/-1;grid-row:4;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+button{font-family:var(--display);font-size:9.5px;font-weight:500;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--ciano);background:transparent;border:1px solid var(--ciano-f);padding:9px 16px;cursor:pointer;
+  transition:background .15s,color .15s,border-color .15s}
+button:hover:not(:disabled){background:rgba(111,227,242,.13);color:var(--gelo);border-color:var(--ciano)}
+button:disabled{opacity:.28;cursor:default}
+button.forte{border-color:var(--ciano);color:var(--gelo)}
+#bMic[aria-pressed="true"]{border-color:var(--ciano);color:var(--gelo);
+  background:rgba(111,227,242,.12)}
+#menu{grid-column:1/-1;grid-row:3;display:flex;align-items:center;margin-bottom:10px;
+  position:relative}
+#lista{position:absolute;left:0;bottom:calc(100% + 8px);z-index:7;
+  background:rgba(5,11,22,.95);backdrop-filter:blur(6px);
+  border:1px solid var(--ciano-f);border-left:2px solid var(--ciano);
+  padding:6px;display:grid;gap:2px;min-width:224px;
+  box-shadow:0 18px 44px -22px #000}
+#lista[hidden]{display:none}
+#lista a{font-family:var(--display);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--tinta-f);text-decoration:none;padding:9px 12px;display:block;
+  border-left:2px solid transparent;transition:background .12s,color .12s,border-color .12s}
+#lista a:hover,#lista a:focus-visible{background:rgba(111,227,242,.12);color:var(--gelo);
+  border-left-color:var(--ciano);outline:none}
+#lista .sep{height:1px;background:var(--ciano-f);margin:4px 8px;opacity:.5}
+#bMenu::after{content:"▸";margin-left:9px;display:inline-block;transition:transform .18s;
+  font-size:11px;line-height:1}
+#bMenu[aria-expanded="true"]::after{transform:rotate(90deg)}
+.bt{font-family:var(--display);font-size:9px;font-weight:500;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--ciano);background:transparent;
+  border:1px solid var(--ciano-f);padding:8px 13px;text-decoration:none;
+  display:inline-block;transition:background .15s,color .15s,border-color .15s}
+.bt:hover{background:rgba(111,227,242,.13);color:var(--gelo);border-color:var(--ciano)}
+.bt:focus-visible{outline:1px solid var(--gelo);outline-offset:2px}
+.bt.destaque{border-color:var(--ciano);color:var(--gelo)}
+button:focus-visible{outline:1px solid var(--gelo);outline-offset:2px}
+#rotVoz{font-family:var(--display);font-size:9px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--tinta-f);margin-left:8px}
+#voz{font-family:var(--texto);font-size:11px;color:var(--tinta);
+  background:rgba(7,18,36,.8);border:1px solid var(--ciano-f);padding:8px 9px;
+  max-width:210px;outline:none}
+#voz:focus{border-color:var(--ciano)}
+#aviso{margin-left:auto;font-family:var(--display);font-size:8.5px;letter-spacing:.17em;
+  text-transform:uppercase;color:#56657a;text-align:right}
+
+@media (max-width:900px){
+  #fios{display:none}
+  #tela{grid-template-columns:1fr;grid-template-rows:auto auto auto auto auto auto;row-gap:12px;overflow-y:auto}
+  #centro{grid-column:1;grid-row:2;overflow:visible;min-height:auto;
+    padding-top:6px;gap:10px}
+  #esq{grid-column:1;grid-row:3}
+  #dir{grid-column:1;grid-row:4}
+  #dir .cartao{border-right:0;border-left:1px solid var(--ciano-f);text-align:left;
+    background:linear-gradient(90deg,rgba(7,18,36,.78),rgba(7,18,36,.1))}
+  #dir .rot{flex-direction:row}
+  #dir .ticks{justify-content:flex-start}
+  #menu{grid-row:5}
+  #rodape{grid-row:6}
+  #aviso{display:none}
+  #reator{width:min(76%,min(380px,46vh))}
+}
+</style>
+
+<div id="moldura"><i></i><i></i><i></i><i></i></div>
+<svg id="fios" aria-hidden="true"></svg>
+
+<div id="tela">
+
+  <header id="topo">
+    <div>
+      <div id="hora">--:--<small id="seg">--</small></div>
+      <div id="data">—</div>
+    </div>
+    <div id="estado"><span id="led"></span><span id="estadoTxt">Em espera</span></div>
+  </header>
+
+  <div class="coluna" id="esq">
+    <article class="cartao" data-sec="clima">
+      <p class="rot"><i>01</i> Clima</p><p class="ticks"></p>
+      <p class="val"><b>24°C</b> · céu limpo</p>
+      <p class="sub">Máxima de 31°, mínima de 19°. Sem chuva prevista. Umidade em 38%.</p>
+    </article>
+    <article class="cartao" data-sec="agenda">
+      <p class="rot"><i>02</i> Agenda</p><p class="ticks"></p>
+      <p class="val">Nenhum compromisso</p>
+      <p class="sub">Dia livre no Google Calendar. Próximo evento: sexta, 19h — entrega da A2.</p>
+    </article>
+    <article class="cartao" data-sec="notas">
+      <p class="rot"><i>03</i> Segundo Cérebro</p><p class="ticks"></p>
+      <p class="val"><b>3</b> notas mexidas</p>
+      <p class="sub">Universo 3D, Interface HUD e WebGL. Duas capturas no Inbox sem processar.</p>
+    </article>
+  </div>
+
+  <div id="centro">
+    <div id="reator"></div>
+    <p id="rotulo" class="marca">Jarvis</p>
+    <p id="frase"><span id="saudacao">Boa noite</span>Pergunte o que quiser. Sua IA roda localmente e na internet — rápida e sempre disponível.</p>
+    <div id="progresso" aria-hidden="true"><i></i></div>
+    <form id="escrita" autocomplete="off">
+      <input id="campo" type="text" maxlength="400" spellcheck="false"
+             placeholder="Escreva aqui" aria-label="Escrever para o Jarvis">
+      <button id="enviar" type="submit" aria-label="Enviar">&#8629;</button>
+    </form>
+  </div>
+
+  <div class="coluna" id="dir">
+    <article class="cartao" data-sec="email">
+      <p class="rot"><i>04</i> E-mail</p><p class="ticks"></p>
+      <p class="val"><b>4</b> novos</p>
+      <p class="sub">Dois do Santander, um da faculdade sobre a A2, um do GitHub. Nenhum urgente.</p>
+    </article>
+    <article class="cartao vazio" data-sec="saude">
+      <p class="rot"><i>05</i> Saúde</p><p class="ticks"></p>
+      <p class="val">Aguardando fonte</p>
+      <p class="sub">Seção reservada. Acende quando o Strava for conectado.</p>
+    </article>
+    <article class="cartao" data-sec="mundo">
+      <p class="rot"><i>06</i> Notícias</p><p class="ticks"></p>
+      <p class="val"><b>3</b> manchetes</p>
+      <p class="sub">Tecnologia e IA. Nada que mexa nos seus projetos abertos hoje.</p>
+    </article>
+  </div>
+
+  <nav id="menu" aria-label="Funcionalidades">
+    <button id="bMenu" type="button" aria-expanded="false" aria-controls="lista">Funcionalidades</button>
+    <div id="lista" hidden>
+      <a href="/?app=1">Conversa</a>
+      <a href="/universo.html">Universo 3D</a>
+      <a href="/modelo.html">Holograma 3D</a>
+      <div class="sep"></div>
+      <a href="/dashboard">Painel</a>
+      <a href="/data-sources">Fontes de Dados</a>
+      <a href="/agents">Agentes</a>
+      <a href="/logs">Registros</a>
+      <div class="sep"></div>
+      <a href="/settings">Configurações</a>
+      <a href="/get-started">Primeiros Passos</a>
+    </div>
+  </nav>
+
+  <footer id="rodape">
+    <button id="bIniciar" class="forte" type="button">Iniciar Atualizações</button>
+    <button id="bParar" type="button" disabled>Parar</button>
+    <button id="bMic" type="button" aria-pressed="false">Conversar</button>
+    <label id="rotVoz" for="voz">Voz</label>
+    <select id="voz" aria-label="Voz da leitura"></select>
+    <p id="aviso">Dados de demonstração · voz do navegador</p>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============ reator: WebGL cru, escrito na mao ============
+     Sem three.js e sem CDN: a pagina funciona offline, e sem a camada da
+     biblioteca eu consigo renderizar aqui e CONFERIR o resultado antes de
+     entregar — foi exatamente isso que faltou nas tentativas anteriores. */
+  var caixa=document.getElementById("reator");
+  var cv=document.createElement("canvas");
+  cv.style.width="100%"; cv.style.height="100%"; cv.style.display="block";
+  caixa.appendChild(cv);
+  var gl=cv.getContext("webgl",{antialias:true,alpha:true,premultipliedAlpha:false});
+  var falando=false, fProg=0;
+  /* Energia: 0..1. A fala bate nela a cada palavra, o microfone a cada
+     quadro. O reator inteiro responde a ela. Antes era um seno fixo
+     enquanto falava — pulsava sempre igual, entao nao parecia pulsar. */
+  var energia=0, pico=0;
+  window.jarvisPulso=function(v){ pico=Math.max(pico, Math.min(1,v)); };
+
+  /* ===== Pulso enquanto ELE fala =====
+     O reator pulsava por `u.onboundary`, que o navegador dispara a cada
+     palavra. So que as vozes ONLINE — e a Francisca Online (Natural) e uma
+     delas — nunca disparam esse evento: a sintese acontece no servidor da
+     Microsoft e o navegador nao sabe onde cada palavra cai. Resultado: um
+     unico pulso no `onstart`, que decai em meio segundo, e o reator passava
+     a frase inteira parado.
+
+     E o microfone tambem nao salva: ele e aberto com echoCancellation
+     ligado (precisa estar, senao ele se transcreve), entao o som do proprio
+     alto-falante e justamente o que o navegador apaga.
+
+     Entao a cadencia e gerada aqui. Nao um seno — seno pulsa sempre igual e
+     o olho percebe na hora que e enfeite. Aqui sao SILABAS: cerca de 5,5
+     por segundo, cada uma com altura propria, com ataque e queda, e uma
+     pausa curta de vez em quando, como quem respira entre frases. Cada fala
+     recebe uma semente diferente, entao duas frases nunca pulsam igual. */
+  function fazerEnvelope(semente){
+    var t0=0, sem=(semente>>>0)||1;
+    function sorte(n){
+      var x=Math.sin(n*12.9898+sem*0.0001)*43758.5453;
+      return x-Math.floor(x);
+    }
+    return function(ms){
+      if(!t0) t0=ms;
+      var s=(ms-t0)/1000;
+      var passo=s*5.5;                 /* silabas por segundo */
+      var i=Math.floor(passo), f=passo-i;
+      var alt=.42+sorte(i)*.58;        /* esta silaba e forte ou fraca */
+      if(sorte(i+777)>.90) alt*=.12;   /* respiro entre frases */
+      var forma=Math.sin(Math.PI*Math.min(1,f*1.35));   /* sobe e desce */
+      return Math.max(0, alt*forma);
+    };
+  }
+  var faleEnv=null, falavaAntes=false;
+  var medirReator=function(){};   /* vira a real quando ha WebGL */
+  var barraProg=document.getElementById("progresso");
+  var barraFita=barraProg?barraProg.querySelector("i"):null;
+  /* O progresso morava no anel que girava em volta do reator, e o anel saiu
+     por deixar tudo com cara de qualquer-IA. Virou uma linha fina sob o
+     JARVIS: aparece quando comeca, enche, e some sozinha no fim. */
+  function desenhar(f){
+    fProg=Math.max(0,Math.min(1,f));
+    if(!barraFita) return;
+    barraFita.style.width=(fProg*100).toFixed(1)+"%";
+    if(barraProg) barraProg.classList.toggle("vivo", fProg>0 && fProg<1);
+  }
+
+  if(!gl){
+    caixa.innerHTML='<p style="color:#78899c;font-size:12px;text-align:center;padding:2em">'+
+      'Este navegador nao tem WebGL, entao o reator nao aparece. O briefing funciona igual.</p>';
+    window.__semGL=true;
+  }
+  if(gl){
+/* ---------- matrizes (sem biblioteca) ---------- */
+function mul(a,b){var o=new Float32Array(16);
+  for(var i=0;i<4;i++)for(var j=0;j<4;j++){var s=0;
+    for(var k=0;k<4;k++)s+=a[k*4+j]*b[i*4+k]; o[i*4+j]=s;} return o;}
+function persp(f,asp,n,fa){var t=1/Math.tan(f/2),o=new Float32Array(16);
+  o[0]=t/asp;o[5]=t;o[10]=(fa+n)/(n-fa);o[11]=-1;o[14]=2*fa*n/(n-fa);return o;}
+function trans(x,y,z){var o=new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1]);return o;}
+function rotY(a){var c=Math.cos(a),s=Math.sin(a);
+  return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]);}
+function rotZ(a){var c=Math.cos(a),s=Math.sin(a);
+  return new Float32Array([c,s,0,0, -s,c,0,0, 0,0,1,0, 0,0,0,1]);}
+function rotX(a){var c=Math.cos(a),s=Math.sin(a);
+  return new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]);}
+
+/* ---------- programa ---------- */
+function sh(t,src){var s=gl.createShader(t);gl.shaderSource(s,src);gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(s);return s;}
+var VS=[
+"attribute vec3 pos; attribute vec3 cor; attribute float tam;",
+"uniform mat4 mvp; uniform mat4 mv; uniform float forca; uniform float esc; uniform float mult;",
+"varying vec3 vCor;",
+"void main(){",
+" vec4 e=mv*vec4(pos,1.0);",
+" float prof=clamp((e.z+2.2)/4.4,0.0,1.0);",      // atras = menor
+" vCor=cor*forca*(0.45+0.55*prof);",
+" gl_Position=mvp*vec4(pos,1.0);",
+" gl_PointSize=max(1.0,tam*esc*mult*(0.55+0.45*prof));",
+"}"].join("\n");
+var FS=[
+"precision mediump float;",
+"uniform sampler2D mapa; uniform float ePonto;",
+"varying vec3 vCor;",
+"void main(){",
+" vec4 t=ePonto>0.5?texture2D(mapa,gl_PointCoord):vec4(1.0);",
+" gl_FragColor=vec4(vCor,1.0)*t;",
+"}"].join("\n");
+var prog=gl.createProgram();
+gl.attachShader(prog,sh(gl.VERTEX_SHADER,VS));
+gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,FS));
+gl.linkProgram(prog);
+if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw gl.getProgramInfoLog(prog);
+gl.useProgram(prog);
+var aPos=gl.getAttribLocation(prog,"pos"), aCor=gl.getAttribLocation(prog,"cor"),
+    aTam=gl.getAttribLocation(prog,"tam"),
+    uMvp=gl.getUniformLocation(prog,"mvp"), uMv=gl.getUniformLocation(prog,"mv"),
+    uForca=gl.getUniformLocation(prog,"forca"), uPonto=gl.getUniformLocation(prog,"ePonto"),
+    uEsc=gl.getUniformLocation(prog,"esc"), uMult=gl.getUniformLocation(prog,"mult");
+
+/* ---------- textura do ponto ---------- */
+(function(){
+  var S=64,c=document.createElement("canvas");c.width=c.height=S;
+  var g=c.getContext("2d"),m=S/2,gr=g.createRadialGradient(m,m,0,m,m,m);
+  gr.addColorStop(0,"rgba(255,255,255,1)");
+  gr.addColorStop(.12,"rgba(255,255,255,.92)");
+  gr.addColorStop(.30,"rgba(255,255,255,.34)");
+  gr.addColorStop(.62,"rgba(255,255,255,.07)");
+  gr.addColorStop(1,"rgba(255,255,255,0)");
+  g.fillStyle=gr;g.fillRect(0,0,S,S);
+  var t=gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D,t);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,c);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+})();
+
+var _s=11; function rnd(){_s=(_s*1103515245+12345)&0x7fffffff;return _s/0x7fffffff;}
+
+/* ---------- veus que envolvem a esfera ---------- */
+function veus(nVeu,porVeu,rBase,rVar,arcoMin,arcoMax,tamBase,ganho){
+  var N=nVeu*porVeu, pos=new Float32Array(N*3), cor=new Float32Array(N*3), tam=new Float32Array(N), i=0;
+  for(var v=0;v<nVeu;v++){
+    var th=rnd()*6.2832, ph=Math.acos(2*rnd()-1);
+    var ex=Math.sin(ph)*Math.cos(th), ey=Math.cos(ph), ez=Math.sin(ph)*Math.sin(th);
+    var ax=rnd()-.5, ay=rnd()-.5, az=rnd()-.5;
+    var ix=ey*az-ez*ay, iy=ez*ax-ex*az, iz=ex*ay-ey*ax;
+    var n=Math.hypot(ix,iy,iz)||1; ix/=n; iy/=n; iz/=n;
+    var raio=rBase+(rnd()-.5)*rVar, arco=arcoMin+rnd()*(arcoMax-arcoMin);
+    var giro=rnd()*6.2832, ondas=2+((rnd()*3)|0), amp=.05+rnd()*.16, fase=rnd()*6.2832;
+    var desvio=(rnd()-.5)*.18, trem=.002+rnd()*.006;
+    for(var k=0;k<porVeu;k++){
+      var t=k/(porVeu-1), a=giro+t*arco, c=Math.cos(a), s=Math.sin(a);
+      /* Rodrigues em torno do eixo e */
+      var d=ex*ix+ey*iy+ez*iz;
+      var cx=ey*iz-ez*iy, cy=ez*ix-ex*iz, cz=ex*iy-ey*ix;
+      var px=ix*c+cx*s+ex*d*(1-c), py=iy*c+cy*s+ey*d*(1-c), pz=iz*c+cz*s+ez*d*(1-c);
+      var rr=raio*(1+amp*Math.sin(t*ondas*6.2832+fase));
+      var off=Math.sin(t*Math.PI*1.3+fase)*desvio*raio;
+      px=px*rr+ex*off; py=py*rr+ey*off; pz=pz*rr+ez*off;
+      pos[i*3]=px+(rnd()-.5)*trem; pos[i*3+1]=py+(rnd()-.5)*trem; pos[i*3+2]=pz+(rnd()-.5)*trem;
+      var env=Math.sin(t*Math.PI), e2=env*env;
+      var quente=Math.max(0,1-rr/1.2);
+      var b=e2*ganho*(.62+rnd()*1.05);
+      cor[i*3]  =(0.18+0.82*quente)*b;
+      cor[i*3+1]=(0.52+0.44*quente)*b;
+      cor[i*3+2]=(0.86+0.14*quente)*b;
+      tam[i]=tamBase*(.35+env*.8)*(.6+rnd()*.8);
+      i++;
+    }
+  }
+  return {pos:pos,cor:cor,tam:tam,n:N};
+}
+
+function buffer(dados){
+  var b={};
+  b.p=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b.p); gl.bufferData(gl.ARRAY_BUFFER,dados.pos,gl.STATIC_DRAW);
+  b.c=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b.c); gl.bufferData(gl.ARRAY_BUFFER,dados.cor,gl.STATIC_DRAW);
+  if(dados.tam){b.t=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b.t); gl.bufferData(gl.ARRAY_BUFFER,dados.tam,gl.STATIC_DRAW);}
+  b.n=dados.n; return b;
+}
+function nuvemCrua(pos,cor,tam){
+  return buffer({pos:pos,cor:cor,tam:tam,n:tam.length});
+}
+
+/* Limbo: casca fina e densa exatamente em r=1. E o que da a BORDA de bolha
+   da referencia; sem ela o contorno do orbe fica esfarrapado. */
+var limbo=(function(){
+  var N=11000,pos=new Float32Array(N*3),cor=new Float32Array(N*3),tam=new Float32Array(N);
+  for(var i=0;i<N;i++){
+    var th=rnd()*6.2832, ph=Math.acos(2*rnd()-1), r=1.0+(rnd()-.5)*.028;
+    pos[i*3]=r*Math.sin(ph)*Math.cos(th);pos[i*3+1]=r*Math.cos(ph);pos[i*3+2]=r*Math.sin(ph)*Math.sin(th);
+    var b=.12+rnd()*.2;
+    cor[i*3]=b*.48;cor[i*3+1]=b*.86;cor[i*3+2]=b;
+    tam[i]=.45+rnd()*1.0;
+  }
+  return nuvemCrua(pos,cor,tam);
+})();
+
+/* Risco horizontal de luz atravessando o nucleo, como na referencia */
+var risco=(function(){
+  var N=1600,pos=new Float32Array(N*3),cor=new Float32Array(N*3),tam=new Float32Array(N);
+  for(var i=0;i<N;i++){
+    var u=rnd()*2-1;
+    pos[i*3]=u*2.4;pos[i*3+1]=(rnd()-.5)*.014;pos[i*3+2]=(rnd()-.5)*.014;
+    var q=Math.exp(-Math.abs(u)*2.4), b=q*(.25+rnd()*.35);
+    cor[i*3]=b*.7;cor[i*3+1]=b*.95;cor[i*3+2]=b;
+    tam[i]=.6+q*2.6;
+  }
+  return nuvemCrua(pos,cor,tam);
+})();
+var nucleo=(function(){
+  var N=2600,pos=new Float32Array(N*3),cor=new Float32Array(N*3),tam=new Float32Array(N);
+  for(var i=0;i<N;i++){
+    var th=rnd()*6.2832, ph=Math.acos(2*rnd()-1), r=Math.pow(rnd(),2.1)*0.30;
+    pos[i*3]=r*Math.sin(ph)*Math.cos(th); pos[i*3+1]=r*Math.cos(ph); pos[i*3+2]=r*Math.sin(ph)*Math.sin(th);
+    var q=1-r/0.30, b=(.03+Math.pow(q,4.0)*0.62);
+    cor[i*3]=b*0.92; cor[i*3+1]=b*0.97; cor[i*3+2]=b;
+    tam[i]=4+Math.pow(q,1.8)*7;
+  }
+  /* aureola: poucos pontos enormes e fracos, para a luz cair devagar */
+  var M=70, p2=new Float32Array((N+M)*3), c2=new Float32Array((N+M)*3), t2=new Float32Array(N+M);
+  p2.set(pos); c2.set(cor); t2.set(tam);
+  for(var j=0;j<M;j++){
+    var k=N+j, rr=rnd()*0.1;
+    p2[k*3]=(rnd()-.5)*rr; p2[k*3+1]=(rnd()-.5)*rr; p2[k*3+2]=(rnd()-.5)*rr;
+    var bb=.03+rnd()*.03;
+    c2[k*3]=bb*.55; c2[k*3+1]=bb*.8; c2[k*3+2]=bb;
+    t2[k]=70+rnd()*90;
+  }
+  return buffer({pos:p2,cor:c2,tam:t2,n:N+M});
+})();
+
+/* nevoa: preenche o vazio entre os fios para virar nuvem, nao novelo */
+var nevoa=(function(){
+  var N=52000,pos=new Float32Array(N*3),cor=new Float32Array(N*3),tam=new Float32Array(N);
+  for(var i=0;i<N;i++){
+    var th=rnd()*6.2832, ph=Math.acos(2*rnd()-1);
+    var r=0.30+Math.pow(rnd(),0.55)*0.82;
+    pos[i*3]=r*Math.sin(ph)*Math.cos(th); pos[i*3+1]=r*Math.cos(ph); pos[i*3+2]=r*Math.sin(ph)*Math.sin(th);
+    var q=Math.max(0,1-Math.abs(r-0.92)/0.62);
+    var b=(.055+q*q*.26)*(.5+rnd());
+    cor[i*3]=b*.26; cor[i*3+1]=b*.62; cor[i*3+2]=b;
+    tam[i]=3+rnd()*7;
+  }
+  return buffer({pos:pos,cor:cor,tam:tam,n:N});
+})();
+
+/* Espirais logaritmicas num plano comum. E o que faz o orbe ler como
+   REDEMOINHO visto de frente, e nao como novelo de arcos soltos: o raio
+   cresce com o angulo, que e a curva de um furacao. Era a diferenca
+   estrutural que faltava para a referencia. */
+function espirais(nEsp,porEsp,voltas,tamBase,ganho,espessura){
+  var N=nEsp*porEsp;
+  var pos=new Float32Array(N*3),cor=new Float32Array(N*3),tam=new Float32Array(N),i=0;
+  for(var e=0;e<nEsp;e++){
+    var th0=rnd()*6.2832, r0=.10+rnd()*.10, rf=.85+rnd()*.35;
+    var k=Math.log(rf/r0), sent=(e%2?1:-1), incl=(rnd()-.5)*espessura;
+    var fase=rnd()*6.2832, ampl=.02+rnd()*.05;
+    for(var j=0;j<porEsp;j++){
+      var u=j/(porEsp-1), r=r0*Math.exp(k*u), a=th0+sent*u*voltas*6.2832;
+      pos[i*3]  =Math.cos(a)*r;
+      pos[i*3+1]=Math.sin(a)*r;
+      pos[i*3+2]=incl*r+Math.sin(u*9+fase)*ampl;
+      var qd=Math.max(0,1-r/1.15);
+      var b=(.08+Math.pow(1-u,1.5)*.42+qd*.3)*ganho*(.6+rnd()*.8);
+      cor[i*3]  =(.18+.70*qd)*b;
+      cor[i*3+1]=(.52+.45*qd)*b;
+      cor[i*3+2]=(.88+.12*qd)*b;
+      tam[i]=tamBase*(.3+qd*.9)*(.6+rnd()*.7);
+      i++;
+    }
+  }
+  return buffer({pos:pos,cor:cor,tam:tam,n:N});
+}
+var vortice =espirais(260,190,1.15,6.0,1.0,.55);
+var vortice2=espirais(150,150,0.75,5.2,.85,.9);
+
+var camadas=[
+  {b:buffer(veus(110,330,1.00,.11,3.0,7.0,7.0,.62)), vy: .05, vx: .018},
+  {b:buffer(veus(80,290,0.73,.11,3.4,7.6,6.6,.6)), vy:-.10, vx: .035},
+  {b:buffer(veus(55,240,0.44,.09,4.0,8.6,6.2,.75)), vy: .02, vx:-.02}
+];
+
+/* ---------- aneis concentricos + orbitas ---------- */
+function circulo(r,n,bri,tamPt){
+  var pos=new Float32Array(n*3), cor=new Float32Array(n*3), tam=new Float32Array(n);
+  for(var i=0;i<n;i++){var a=i/n*6.2832;
+    pos[i*3]=Math.cos(a)*r; pos[i*3+1]=Math.sin(a)*r; pos[i*3+2]=0;
+    cor[i*3]=.62*bri; cor[i*3+1]=.88*bri; cor[i*3+2]=1*bri;
+    tam[i]=tamPt||5;}
+  return {pos:pos,cor:cor,tam:tam,n:n};
+}
+/* aneis concentricos do centro: a mira que a referencia tem */
+var ondas=[.15,.23,.33,.45,.60,.78].map(function(r,i){
+  return {b:buffer(circulo(r,Math.round(300+r*900),.8-i*.1,2.6))};
+});
+/* As tres orbitas cruzadas saíram em 12/11/2026: o Gustavo achou que
+   deixavam o reator com cara de qualquer-IA. O progresso do briefing, que
+   morava nelas, ja aparece nos paineis acendendo um a um. */
+
+function liga(b,comTam){
+  gl.bindBuffer(gl.ARRAY_BUFFER,b.p); gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos,3,gl.FLOAT,false,0,0);
+  gl.bindBuffer(gl.ARRAY_BUFFER,b.c); gl.enableVertexAttribArray(aCor);
+  gl.vertexAttribPointer(aCor,3,gl.FLOAT,false,0,0);
+  if(comTam&&b.t){gl.bindBuffer(gl.ARRAY_BUFFER,b.t); gl.enableVertexAttribArray(aTam);
+    gl.vertexAttribPointer(aTam,1,gl.FLOAT,false,0,0);}
+  else {gl.disableVertexAttribArray(aTam); gl.vertexAttrib1f(aTam,1);}
+}
+
+gl.disable(gl.DEPTH_TEST);
+gl.enable(gl.BLEND);
+gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
+gl.clearColor(0,0,0,0);
+
+var P=persp(0.72,1,0.1,100), V=trans(0,0,-4.1);
+  /* ---- tamanho do canvas acompanha a caixa ---- */
+  medirReator=function(){
+    var w=caixa.clientWidth||300;
+    var dpr=Math.min(window.devicePixelRatio||1,2);
+    /* Renderiza acima do tamanho de tela e deixa o navegador reduzir.
+       Reducao e media de pixels: e o que da borda limpa no filamento. */
+    var res=Math.min(1600,Math.max(w*dpr,w*1.9));
+    cv.width=Math.round(res); cv.height=Math.round(res);
+    gl.viewport(0,0,cv.width,cv.height);
+    var e=cv.height/900;
+    gl.uniform1f(uEsc,e);               /* calibrado a 900px */
+    /* O brilho segue o tamanho NA TELA, nao a resolucao interna: o
+       supersampling afina a borda, nao escurece nada. */
+    var eTela=w/900;
+    compensa=Math.max(.7,Math.min(2.4,1.3/Math.pow(Math.max(eTela,.18),1.35)));
+  };
+  medirReator();
+
+  /* ---- parallax do mouse ---- */
+  var mx=0,my=0,amx=0,amy=0;
+  window.addEventListener("pointermove",function(e){
+    mx=(e.clientX/window.innerWidth-.5); my=(e.clientY/window.innerHeight-.5);
+  });
+
+  var compensa=1;
+  /* Bloom barato e honesto: desenha a mesma geometria duas vezes, a
+     primeira enorme e fraca (o halo), a segunda no tamanho certo (o fio).
+     E o borrao de luz em volta que faz filamento virar massa luminosa. */
+  function nuvem(b,M,f){
+    gl.uniformMatrix4fv(uMv,false,M);
+    gl.uniformMatrix4fv(uMvp,false,mul(P,M));
+    gl.uniform1f(uPonto,1); liga(b,true);
+    gl.uniform1f(uMult,4.2);  gl.uniform1f(uForca,f*compensa*0.26);
+    gl.drawArrays(gl.POINTS,0,b.n);                       /* halo */
+    gl.uniform1f(uMult,1.0);  gl.uniform1f(uForca,f*compensa*1.45);
+    gl.drawArrays(gl.POINTS,0,b.n);                       /* corpo */
+    gl.uniform1f(uMult,0.36); gl.uniform1f(uForca,f*compensa*1.75);
+    gl.drawArrays(gl.POINTS,0,b.n);                       /* fio nitido */
+  }
+  function faixa(b,M,f,ini,qtd){
+    gl.uniformMatrix4fv(uMv,false,M);
+    gl.uniformMatrix4fv(uMvp,false,mul(P,M));
+    gl.uniform1f(uPonto,1); liga(b,true);
+    gl.uniform1f(uMult,3.4);  gl.uniform1f(uForca,f*compensa*0.3);
+    gl.drawArrays(gl.POINTS,ini,qtd);
+    gl.uniform1f(uMult,1.0);  gl.uniform1f(uForca,f*compensa*1.5);
+    gl.drawArrays(gl.POINTS,ini,qtd);
+    gl.uniform1f(uMult,0.34); gl.uniform1f(uForca,f*compensa*1.85);
+    gl.drawArrays(gl.POINTS,ini,qtd);
+  }
+
+  var NB=12;                       /* bobinas na orbita do meio */
+  (function laco(ms){
+    requestAnimationFrame(laco);
+    var t=ms/1000;
+    amx+=(mx-amx)*.05; amy+=(my-amy)*.05;
+    var olhar=mul(V,mul(rotY(amx*.6),rotX(amy*.4)));
+
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    /* decaimento rapido: o pulso tem que cair entre uma palavra e outra */
+    pico*=.86;
+    /* Enquanto ele fala, a cadencia vem do envelope. Isso observa so a
+       bandeira `falando`, que os tres caminhos de fala ja mantem — nao
+       precisou mexer em nenhum deles. */
+    if(falando){
+      if(!falavaAntes){ faleEnv=fazerEnvelope(Math.floor(ms*1000)); falavaAntes=true; }
+      window.jarvisPulso(faleEnv(ms));
+    }else if(falavaAntes){ falavaAntes=false; faleEnv=null; }
+    energia+=(pico-energia)*.35;
+    var respiro=.045*Math.sin(t*1.15);          /* em repouso, respira */
+    var pulso=1+respiro+energia*.62;
+    /* Antes a energia acelerava o giro, e o reator dava arrancos quando ele
+       falava. Agora a energia muda so o brilho e o tamanho do pulso: a
+       rotacao e constante, que e o que da a sensacao de maquina ligada. */
+    var vv=1;
+
+    nuvem(nevoa, mul(olhar,rotY(-t*.025)), pulso*.95);
+    camadas.forEach(function(c){
+      nuvem(c.b, mul(olhar,mul(rotY(t*c.vy*vv),rotX(t*c.vx*vv))), pulso);
+    });
+    /* o redemoinho gira no proprio plano, devagar */
+    nuvem(vortice,  mul(olhar,mul(rotX(.22),rotZ(-t*.07*vv))), pulso*1.05);
+    nuvem(vortice2, mul(olhar,mul(rotX(.22),rotZ( t*.11*vv))), pulso*.95);
+    nuvem(limbo, mul(olhar,rotY(t*.035)), pulso*1.15);
+    nuvem(risco, olhar, pulso*(1+energia*.5));
+    nuvem(nucleo, mul(olhar,rotY(t*.03)), pulso*(falando?1.15:1));
+
+    ondas.forEach(function(o){ faixa(o.b, olhar, pulso*1.9, 0, o.b.n); });
+
+  })(0);
+  }
+
+  /* ---- traços dos cartoes */
+  [].forEach.call(document.querySelectorAll(".ticks"),function(tk){
+    for(var i=0;i<22;i++){
+      var s=document.createElement("span");
+      s.style.height=(i%4===0?4:2)+"px"; tk.appendChild(s);
+    }
+  });
+
+  /* ====================================================== relogio */
+  var elH=document.getElementById("hora"), elS=document.getElementById("seg"),
+      elD=document.getElementById("data");
+  var DIAS=["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
+  var MES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  function p2(n){return n<10?"0"+n:""+n;}
+  var elSaud=document.getElementById("saudacao");
+  function relogio(){
+    var d=new Date();
+    if(elSaud){
+      var h=d.getHours();
+      /* tres faixas explicitas. Com ternario encadeado a madrugada caia
+         em "Boa tarde", porque 3 < 18 e verdadeiro. */
+      var saud="Boa noite";                    /* 18h-23h e 0h-4h59 */
+      if(h>=5 && h<12) saud="Bom dia";
+      else if(h>=12 && h<18) saud="Boa tarde";
+      elSaud.textContent=saud;
+    }
+    elH.firstChild.nodeValue=p2(d.getHours())+":"+p2(d.getMinutes());
+    elS.textContent=p2(d.getSeconds());
+    elD.textContent=DIAS[d.getDay()]+", "+d.getDate()+" "+MES[d.getMonth()]+" "+d.getFullYear()+" · Brasília";
+  }
+  relogio(); setInterval(relogio,1000);
+
+  /* ======================================================== fios */
+  var NS="http://www.w3.org/2000/svg";
+  var fios=document.getElementById("fios"),
+      cartoes=[].slice.call(document.querySelectorAll(".cartao")), linhas={};
+  cartoes.forEach(function(c){
+    var l=document.createElementNS(NS,"line");
+    l.setAttribute("stroke","rgba(111,227,242,.34)");
+    l.setAttribute("stroke-width","1");
+    l.setAttribute("stroke-dasharray","3 5");
+    l.setAttribute("opacity","0");
+    fios.appendChild(l); linhas[c.dataset.sec]=l;
+  });
+  function tracar(){
+    if(window.innerWidth<900) return;
+    var rr=caixa.getBoundingClientRect();
+    var cx=rr.left+rr.width/2, cy=rr.top+rr.height/2, raio=rr.width*0.42;
+    cartoes.forEach(function(c){
+      var b=c.getBoundingClientRect(), l=linhas[c.dataset.sec];
+      var x1=(b.left<cx)?b.right:b.left, y1=b.top+b.height/2;
+      var dx=cx-x1, dy=cy-y1, d=Math.hypot(dx,dy)||1;
+      l.setAttribute("x1",x1); l.setAttribute("y1",y1);
+      l.setAttribute("x2",cx-dx/d*raio); l.setAttribute("y2",cy-dy/d*raio);
+    });
+  }
+  window.addEventListener("resize",function(){medirReator();tracar();});
+  requestAnimationFrame(tracar);
+
+  /* ==================================================== briefing */
+  var DEMO_SECOES=[
+    {sec:null,rot:"Saudação",fala:"",frase:""},   /* preenchida na hora, pelo relogio */
+    {sec:"clima",rot:"Clima",
+     fala:"O dia em Brasília começa com vinte e quatro graus e céu limpo. A máxima prevista é de trinta e um graus, sem chuva.",
+     frase:"24 graus, céu limpo, sem chuva."},
+    {sec:"agenda",rot:"Agenda",
+     fala:"Nenhum compromisso marcado para hoje. O próximo evento é na sexta, às sete da noite: entrega da atividade A2.",
+     frase:"Dia livre. Próximo evento na sexta."},
+    {sec:"email",rot:"E-mail",
+     fala:"Você tem quatro e-mails novos. Dois do Santander, um da faculdade sobre a A2 e um do GitHub. Nenhum parece urgente.",
+     frase:"4 novos, nenhum urgente."},
+    {sec:"notas",rot:"Segundo Cérebro",
+     fala:"No seu Segundo Cérebro, três notas foram mexidas desde ontem: Universo 3D, Interface HUD e WebGL. Duas capturas seguem no Inbox sem processar.",
+     frase:"3 notas mexidas, 2 capturas no Inbox."},
+    {sec:"saude",rot:"Saúde",
+     fala:"A seção de saúde está sem fonte conectada. Ela acende quando o Strava entrar.",
+     frase:"Sem fonte conectada ainda."},
+    {sec:"mundo",rot:"Mundo",
+     fala:"Nas notícias, três manchetes de tecnologia e inteligência artificial. Nada que mexa nos seus projetos abertos. Bom trabalho hoje.",
+     frase:"3 manchetes. Nada que te afete."}
+  ];
+
+  var SECOES=DEMO_SECOES, dadosReais=false;
+
+  /* Busca o briefing de verdade. O servidor monta as frases com molde, sem
+     passar pelo modelo, entao responde em poucos segundos. Se falhar, a
+     pagina segue com os dados de demonstracao. */
+  function aplicar(d){
+    if(!d||!d.secoes||!d.secoes.length) return false;
+    /* A saudacao sempre chama pelo nome: "Boa noite, Gustavo." Se o servidor
+       mandar so "Boa noite." (nao achou o nome), completa aqui. Pedido do
+       Gustavo em 16/11 (antes era "senhor"). */
+    var abre=String(d.abertura||"").trim();
+    /* 16/11 meio-dia: SEM virgula ("Bom dia Gustavo."), soa melhor falado */
+    abre=abre.replace(/,?\s*(senhor|Gustavo)\s*\.?$/i,"").replace(/[.!,\s]*$/,"");
+    if(abre) abre+=" Gustavo.";
+    var novas=[{sec:null,rot:"Saudação",fala:abre,frase:abre}];
+    var vivos={};
+    d.secoes.forEach(function(s){
+      vivos[s.id]=1;
+      novas.push({sec:s.id,rot:s.rot,fala:s.fala,frase:s.frase});
+      var c=document.querySelector('.cartao[data-sec="'+s.id+'"]');
+      if(c){
+        c.classList.remove("vazio");
+        var v=c.querySelector(".val"),u=c.querySelector(".sub");
+        if(v) v.textContent=s.valor||"";
+        if(u) u.textContent=s.detalhe||"";
+      }
+    });
+    [].forEach.call(document.querySelectorAll(".cartao"),function(c){
+      if(!vivos[c.dataset.sec]){
+        c.classList.add("vazio");
+        var v=c.querySelector(".val"),u=c.querySelector(".sub");
+        if(v) v.textContent="Aguardando fonte";
+        if(u) u.textContent="Conecte em Fontes de Dados para esta seção acender.";
+      }
+    });
+    SECOES=novas; dadosReais=true;
+    var av=document.getElementById("aviso");
+    if(av) av.textContent="Dados do seu Jarvis · voz do navegador";
+    return true;
+  }
+  /* Servidor recem-subido demora a responder a primeira vez (conectores
+     acordando). Antes uma falha deixava a tela em dados de demonstracao
+     para sempre, sem nada dizendo que era provisorio. Agora ela insiste:
+     tres tentativas, esperando mais a cada vez. O servidor tambem aquece
+     sozinho na subida, entao na pratica a primeira ja pega. */
+  (function buscarBriefing(tentativa){
+    fetch("/api/briefing",{cache:"no-store"})
+      .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+      .then(function(d){ aplicar(d); })
+      .catch(function(){
+        /* 2,5s, 5s, 7,5s, 10s: cobre uns 25s de subida fria sem martelar
+           o servidor que ainda esta acordando. */
+        if(tentativa<5) setTimeout(function(){ buscarBriefing(tentativa+1); }, tentativa*2500);
+      });
+  })(1);
+
+  var rotulo=document.getElementById("rotulo"), frase=document.getElementById("frase"),
+      fraseInicial=document.getElementById("frase").innerHTML,
+      estadoTxt=document.getElementById("estadoTxt"),
+      bIniciar=document.getElementById("bIniciar"), bParar=document.getElementById("bParar");
+
+  var sintese=window.speechSynthesis||null, voz=null, temVoz=false;
+  var selVoz=document.getElementById("voz");
+
+  function guardada(){ try{ return localStorage.getItem("jarvis.voz")||""; }catch(e){ return ""; } }
+  function guardar(n){ try{ localStorage.setItem("jarvis.voz",n); }catch(e){} }
+
+  /* Ordem de preferencia: a escolhida por voce; senao a do Google em pt-BR,
+     que soa bem melhor que a da Microsoft; senao qualquer pt-BR; senao pt. */
+  function acharVoz(){
+    if(!sintese) return;
+    var vs=sintese.getVoices()||[];
+    var pt=vs.filter(function(v){return /^pt/i.test(v.lang);});
+    var br=pt.filter(function(v){return /BR/i.test(v.lang);});
+    var alvo=guardada();
+    voz = (alvo && pt.filter(function(v){return v.name===alvo;})[0])
+       || br.filter(function(v){return /google/i.test(v.name);})[0]
+       || br[0] || pt[0] || null;
+    temVoz=!!voz;
+
+    if(selVoz){
+      selVoz.innerHTML="";
+      (pt.length?pt:vs).forEach(function(v){
+        var o=document.createElement("option");
+        o.value=v.name;
+        o.textContent=v.name.replace(/^Microsoft /,"").replace(/ - Portuguese.*$/i,"")
+                       +" ("+v.lang+")";
+        if(voz&&v.name===voz.name) o.selected=true;
+        selVoz.appendChild(o);
+      });
+      selVoz.disabled=!vs.length;
+    }
+  }
+  if(sintese){ acharVoz(); sintese.onvoiceschanged=acharVoz; }
+  if(selVoz) selVoz.addEventListener("change",function(){
+    guardar(selVoz.value); acharVoz();
+    if(sintese&&voz){           /* amostra curta, para ouvir a escolha */
+      sintese.cancel();
+      var u=new SpeechSynthesisUtterance("Pronto. Esta é a minha voz.");
+      u.voice=voz; u.lang=voz.lang; u.rate=.98; sintese.speak(u);
+    }
+  });
+
+  var rodando=false, rafId=0, timer=0, tIni=0, dur=0, fA=0, fB=0;
+  function animar(){
+    if(!rodando) return;
+    var t=(performance.now()-tIni)/Math.max(dur,1);
+    desenhar(fA+(fB-fA)*Math.min(1,t));
+    if(t<1) rafId=requestAnimationFrame(animar);
+  }
+  function limpar(){
+    cancelAnimationFrame(rafId); clearTimeout(timer);
+    if(sintese) sintese.cancel();
+    falando=false; document.body.classList.remove("falando");
+  }
+  /* ---- clicar num cartao abre a funcionalidade dele ----
+     O cartao ja diz "4 novos e-mails". O passo seguinte obvio e querer
+     VER os quatro, e ate agora nao havia caminho: era ler e procurar o
+     menu. Cada secao agora leva ao lugar onde ela mora. */
+  (function(){
+    var DESTINO={
+      notas:  {url:"/universo.html",            nome:"Segundo Cérebro"},
+      email:  {url:"https://mail.google.com/",  nome:"Gmail", fora:true},
+      agenda: {url:"https://calendar.google.com/", nome:"Google Agenda", fora:true},
+      clima:  {url:"/data-sources",             nome:"Fontes de Dados"},
+      saude:  {url:"/data-sources",             nome:"Fontes de Dados"},
+      mundo:  {url:"/data-sources",             nome:"Fontes de Dados"}
+    };
+    document.querySelectorAll(".cartao[data-sec]").forEach(function(c){
+      var d=DESTINO[c.getAttribute("data-sec")];
+      if(!d) return;
+      c.classList.add("clicavel");
+      c.setAttribute("role","link");
+      c.setAttribute("tabindex","0");
+      c.setAttribute("title","Abrir "+d.nome);
+      function abrir(){
+        /* no app proprio, Gmail e Agenda abrem no navegador dentro da tela */
+        if(d.fora && window.jarvisPainel && window.jarvisPainel.abrir(d.url)) return;
+        if(d.fora){
+          /* sai do Jarvis: aba nova, para nao perder a tela de vista */
+          var j=null;
+          try{ j=window.open(d.url,"_blank"); }catch(e){}
+          if(j){ try{ j.opener=null; }catch(e){} }
+          else window.location.href=d.url;
+        }else window.location.href=d.url;
+      }
+      c.addEventListener("click",abrir);
+      c.addEventListener("keydown",function(e){
+        if(e.key==="Enter"||e.key===" "){ e.preventDefault(); abrir(); }
+      });
+    });
+  })();
+
+  /* ---- chat escrito ---- */
+  (function(){
+    var f=document.getElementById("escrita"), c=document.getElementById("campo");
+    if(!f||!c) return;
+    f.addEventListener("submit",function(e){
+      e.preventDefault();
+      var t=c.value.trim();
+      if(!t) return;
+      c.value="";
+      if(window.jarvisEscrever) window.jarvisEscrever(t);
+    });
+    /* teclar no campo nao pode disparar atalho de tela nenhum */
+    c.addEventListener("keydown",function(e){ e.stopPropagation(); });
+  })();
+
+  function parar(){
+    rodando=false; limpar();
+    if(window.jarvisFimDasAtualizacoes) window.jarvisFimDasAtualizacoes(true);
+    bIniciar.disabled=false; bParar.disabled=true;
+    estadoTxt.textContent="Em espera"; repouso();
+  }
+  function repouso(){
+    rotulo.textContent="Jarvis"; rotulo.classList.add("marca");
+    frase.innerHTML=fraseInicial;
+    elSaud=document.getElementById("saudacao"); relogio();
+  }
+  function fim(){
+    rodando=false; limpar(); desenhar(1);
+    bIniciar.disabled=false; bParar.disabled=true;
+    bIniciar.textContent="Repetir Atualizações";
+    estadoTxt.textContent="Em espera";
+    /* as mensagens somem: a tela volta ao estado de repouso */
+    frase.style.opacity="0";
+    setTimeout(function(){ repouso(); frase.style.opacity="1"; },420);
+    if(window.jarvisFimDasAtualizacoes) window.jarvisFimDasAtualizacoes();
+  }
+  function saudacaoAgora(){
+    var h=new Date().getHours();
+    return h<5?"Boa noite":h<12?"Bom dia":h<18?"Boa tarde":"Boa noite";
+  }
+  function tocar(i){
+    if(!rodando) return;
+    if(i>=SECOES.length){ fim(); return; }
+    var s=SECOES[i];
+    rotulo.textContent=s.rot; rotulo.classList.remove("marca");
+    frase.textContent=s.fala||s.frase||"";   /* legenda do que esta sendo dito */
+    if(s.sec){
+      var c=document.querySelector('.cartao[data-sec="'+s.sec+'"]');
+      if(c){ c.classList.add("ativo"); var l=linhas[s.sec]; if(l) l.setAttribute("opacity","1"); }
+      tracar();
+    }
+    fA=i/SECOES.length; fB=(i+1)/SECOES.length;
+    dur=Math.max(1800,s.fala.length*64); tIni=performance.now();
+    falando=true; document.body.classList.add("falando");
+    cancelAnimationFrame(rafId); rafId=requestAnimationFrame(animar);
+
+    if(sintese&&temVoz){
+      var u=new SpeechSynthesisUtterance(s.fala);
+      u.voice=voz; u.lang=voz.lang; u.rate=.98; u.pitch=1;
+      u.onstart=function(){ window.jarvisPulso(1); };
+      u.onboundary=function(){ window.jarvisPulso(.95); };  /* a cada palavra */
+      u.onend=function(){ desenhar(fB); tocar(i+1); };
+      u.onerror=function(){ desenhar(fB); tocar(i+1); };
+      sintese.speak(u);
+    }else{
+      timer=setTimeout(function(){ desenhar(fB); tocar(i+1); },dur);
+    }
+  }
+  bIniciar.addEventListener("click",function(){
+    limpar();
+    cartoes.forEach(function(c){c.classList.remove("ativo");});
+    for(var s in linhas) linhas[s].setAttribute("opacity","0");
+    desenhar(0);
+    if(!dadosReais){                      /* na demonstracao, forja a saudacao */
+      var sd=saudacaoAgora();
+      SECOES[0].fala=sd+" Gustavo. Aqui estão as suas atualizações.";
+      SECOES[0].frase=sd+" Gustavo.";
+    }
+    rodando=true; bIniciar.disabled=true; bParar.disabled=false;
+    estadoTxt.textContent=(sintese&&temVoz)?"Falando":"Sem voz pt-BR";
+    if(!(sintese&&temVoz)) document.getElementById("aviso").textContent="Sem voz pt-BR · sequência no tempo estimado";
+    tocar(0);
+  });
+  /* menu de funcionalidades */
+  (function(){
+    var bm=document.getElementById("bMenu"), lista=document.getElementById("lista");
+    function fechar(){ lista.hidden=true; bm.setAttribute("aria-expanded","false"); }
+    function abrir(){ lista.hidden=false; bm.setAttribute("aria-expanded","true"); }
+    bm.addEventListener("click",function(e){
+      e.stopPropagation();
+      if(lista.hidden){ abrir(); var a=lista.querySelector("a"); if(a) a.focus(); }
+      else fechar();
+    });
+    document.addEventListener("click",function(e){
+      if(!lista.hidden && !lista.contains(e.target) && e.target!==bm) fechar();
+    });
+    document.addEventListener("keydown",function(e){
+      if(e.key==="Escape" && !lista.hidden){ fechar(); bm.focus(); }
+    });
+  })();
+
+  /* ================== Conversa por voz ==================
+     Ouve pelo microfone, manda o texto para o /v1/chat/completions do seu
+     proprio Jarvis e fala a resposta com a mesma voz do briefing.
+
+     AVISO, e ele importa: o reconhecimento de fala do Chrome NAO roda
+     local. O audio do microfone vai para servidores do Google. Foi uma
+     escolha consciente do Gustavo em 12/11/2026, trocando privacidade por
+     resposta imediata. Para reverter isso um dia, o caminho e Whisper
+     local — e so esta funcao muda.
+
+     O nivel do som vira "energia": e dela que o reator pulsa. Nada do audio
+     e gravado nem enviado por esta parte; so a amplitude e lida aqui. */
+  (function(){
+    var bm=document.getElementById("bMic");
+    var Rec=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!Rec){ bm.disabled=true; bm.textContent="Sem reconhecimento"; return; }
+
+    var rec=null, ctx=null, fluxo=null, ana=null, dados=null, laco=0;
+    var ativo=false, pensando=false, historico=[], modelo="", retomarDepois=false;
+    /* O Chrome mostra o que voce fala enquanto fala ("interino") e so depois
+       marca como definitivo. Quando ele encerra sem marcar — acontece — o
+       texto ficava na tela e a pergunta sumia calada. Guardo o interino e,
+       se o reconhecimento acabar sem fechar, mando assim mesmo. */
+    var interino="";
+    /* Para poder cortar a fala dele no meio: o microfone fica aberto
+       enquanto ele fala, e o que chegar interrompe. O risco e ele se
+       escutar pelo alto-falante, entao tudo que volta passa por um
+       filtro de eco antes de virar pergunta. */
+    var falando=false;
+    /* O que ja esta baixado, para a tela reconhecer o nome sozinha. E a
+       memoria do projeto: ela sabe o que e nosso sem perguntar a ninguem. */
+    var modelos3d=[], notasVault=[];
+    async function carregarNotas(){
+      try{
+        var d=await fetch("/api/grafo",{cache:"no-store"}).then(function(r){
+          return r.ok?r.json():null;
+        });
+        notasVault=((d&&d.notas)||[]).map(function(n){
+          return {arq:n.arq||n.t, titulo:n.t||n.arq, nome:normaliza(n.t||"")};
+        }).filter(function(n){ return n.nome.length>2; });
+      }catch(e){ notasVault=[]; }
+    }
+    async function carregarModelos3d(){
+      try{
+        var d=await fetch("/api/modelos",{cache:"no-store"}).then(function(r){
+          return r.ok?r.json():null;
+        });
+        modelos3d=((d&&d.modelos)||[]).map(function(m){
+          return {id:m.id, titulo:m.nome||m.id,
+                  chave:normaliza(String(m.id).replace(/-/g," ")),
+                  nome:normaliza(m.nome||"")};
+        });
+      }catch(e){ modelos3d=[]; }
+    }
+
+    function estado(txt,ligado){
+      bm.textContent=txt;
+      bm.setAttribute("aria-pressed", ligado?"true":"false");
+      estadoTxt.textContent=txt;
+    }
+    function dizer(txt){
+      rotulo.textContent="Jarvis"; rotulo.classList.add("marca");
+      frase.textContent=txt;
+    }
+    /* O modelo responde em markdown. Na tela o ** e feio; na voz vira
+       "asterisco asterisco". Tira a marcacao antes de mostrar e de falar. */
+    function semMarcas(t){
+      return String(t)
+        .replace(/```[\s\S]*?```/g," ")
+        .replace(/`/g,"")
+        .replace(/!\[[^\]]*\]\([^)]*\)/g," ")
+        .replace(/\[([^\]]*)\]\([^)]*\)/g,"$1")
+        .replace(/__/g,"")
+        .replace(/(^|\s)#{1,6}\s+/g,"$1")
+        .replace(/^\s*[-*+]\s+/gm,"")
+        .replace(/([.!?:])\s+[-*\u2022]\s+/g,"$1 ")
+        .replace(/\*/g," ")
+        .replace(/[ \t]{2,}/g," ")
+        .trim();
+    }
+
+    async function ligarMedidor(){
+      try{
+        fluxo=await navigator.mediaDevices.getUserMedia({audio:{
+          echoCancellation:true, noiseSuppression:true, autoGainControl:true
+        }});
+        ctx=new (window.AudioContext||window.webkitAudioContext)();
+        ana=ctx.createAnalyser(); ana.fftSize=1024;
+        dados=new Uint8Array(ana.fftSize);
+        ctx.createMediaStreamSource(fluxo).connect(ana);
+        (function medir(){
+          laco=requestAnimationFrame(medir);
+          if(!ana) return;
+          ana.getByteTimeDomainData(dados);
+          var soma=0;
+          for(var i=0;i<dados.length;i++){ var d=(dados[i]-128)/128; soma+=d*d; }
+          var rms=Math.sqrt(soma/dados.length);
+          /* Enquanto ELE fala quem manda e o envelope; o microfone so
+             ouviria o eco cancelado e puxaria o pulso para baixo. */
+          if(!falando)
+            window.jarvisPulso(Math.min(1,Math.max(0,(rms-.010)*11)));
+          if(falando) vigiarCorte(rms);
+        })();
+      }catch(e){ /* sem medidor, a conversa ainda funciona */ }
+    }
+    function desligarMedidor(){
+      if(laco) cancelAnimationFrame(laco), laco=0;
+      ana=null;
+      if(fluxo){ fluxo.getTracks().forEach(function(t){t.stop();}); fluxo=null; }
+      if(ctx){ ctx.close().catch(function(){}); ctx=null; }
+    }
+
+    async function acharModelo(){
+      if(modelo) return modelo;
+      try{
+        var d=await fetch("/v1/models").then(function(r){return r.json();});
+        var lista=d.data||d.models||[];
+        modelo=(lista[0]&&(lista[0].id||lista[0].name))||"";
+      }catch(e){ modelo=""; }
+      return modelo;
+    }
+
+    async function perguntar(texto){
+      pensando=true; estado("Pensando",true); dizer("…");
+      historico.push({role:"user",content:texto});
+      if(historico.length>8) historico=historico.slice(-8);  /* contexto e curto */
+      try{
+        var mdl=await acharModelo();
+        var corpo={messages:historico.slice(),stream:false};
+        if(mdl) corpo.model=mdl;
+        /* Sem isto, um pedido que nunca volta deixava a tela em "Pensando"
+           para sempre, sem nada na tela dizendo o que houve. Um download
+           grande pode passar de um minuto, dai a folga. */
+        var corta=new AbortController();
+        var relogio=setTimeout(function(){ corta.abort(); },75000);
+        var r;
+        try{
+          r=await fetch("/v1/chat/completions",{
+            method:"POST",headers:{"Content-Type":"application/json"},
+            body:JSON.stringify(corpo), signal:corta.signal
+          });
+        } finally { clearTimeout(relogio); }
+        if(!r.ok) throw new Error("HTTP "+r.status);
+        var d=await r.json();
+        var resp=((d.choices||[])[0]||{}).message;
+        resp=(resp&&resp.content)||d.content||"Não veio resposta.";
+        historico.push({role:"assistant",content:resp});
+        responder(resp);
+      }catch(e){
+        pensando=false; falando=false;
+        var m=(e&&e.name==="AbortError")
+          ? "Demorou demais e eu desisti de esperar. Pode repetir?"
+          : "Não consegui falar com o Jarvis: "+String(e).slice(0,70);
+        dizer(m);
+        if(ativo) setTimeout(function(){ try{rec.start();}catch(x){} },600);
+        estado("Conversar",false); ativo=false; desligarMedidor();
+      }
+    }
+
+    function normaliza(t){
+      return String(t).toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+        .replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+    }
+    /* Verdadeiro quando o que o microfone pegou e a propria voz do Jarvis
+       voltando pelo alto-falante: quase toda palavra ouvida ja estava na
+       frase que ele esta dizendo. Com fone de ouvido isso nunca acontece. */
+    /* ===== Interromper a fala =====
+       Antes eu deixava o microfone TRANSCREVENDO enquanto ele falava e
+       tentava descartar o eco comparando texto. Remendo: a voz dele voltava
+       pelo alto-falante e virava pergunta. Agora o reconhecimento fica
+       desligado durante a fala, e quem avisa que voce quer falar e o NIVEL
+       do microfone — que nao confunde a voz dele com a sua.
+
+       Como funciona: nos primeiros ~0,6s de fala eu meco quanto da voz dele
+       vaza para o microfone (com fone de ouvido, quase nada). Depois, som
+       acima do dobro desse vazamento, por 180ms seguidos, e voce falando. */
+    var baseVaz=0, amostrasBase=0, acimaDesde=0;
+    function zerarVigia(){ baseVaz=0; amostrasBase=0; acimaDesde=0; }
+    function vigiarCorte(rms){
+      if(amostrasBase<40){                 /* calibrando o vazamento */
+        if(rms>baseVaz) baseVaz=rms;
+        amostrasBase++;
+        return;
+      }
+      var limite=Math.max(baseVaz*2.2, .045);
+      if(rms>limite){
+        if(!acimaDesde) acimaDesde=performance.now();
+        else if(performance.now()-acimaDesde>180){
+          acimaDesde=0;
+          try{ sintese.cancel(); }catch(e){}   /* cala e devolve a palavra */
+        }
+      }else acimaDesde=0;
+    }
+
+    function responder(texto){
+      texto=semMarcas(texto);
+      dizer(texto);
+      if(!(sintese&&voz)){
+        pensando=false; estado(ativo?"Ouvindo":"Conversar",ativo);
+        if(ativo){ try{rec.start();}catch(e){} }
+        return;
+      }
+      sintese.cancel();
+      var u=new SpeechSynthesisUtterance(texto);
+      u.voice=voz; u.lang=voz.lang; u.rate=.98;
+
+      /* As vozes "Online (Natural)" nem sempre disparam o onend — e quando
+         nao disparam, a conversa morria de pe: ficava "Falando" para
+         sempre, com o microfone desligado, e o Gustavo falava sozinho.
+         Entao o fim da fala nao depende mais so do evento: um vigia
+         confere se a sintese ainda esta falando e encerra na unha. */
+      var acabou=false, comecou=false, vigia=0, nascimento=Date.now();
+      function fimDaFala(){
+        if(acabou) return;
+        acabou=true;
+        if(vigia){ clearInterval(vigia); vigia=0; }
+        falando=false; pensando=false;
+        if(ativo){ estado("Ouvindo",true); try{rec.start();}catch(e){} }
+        else estado("Conversar",false);
+      }
+      u.onstart=function(){
+        comecou=true;
+        estado("Falando",true); window.jarvisPulso(1);
+        falando=true; zerarVigia();
+        try{ rec&&rec.stop(); }catch(e){}   /* nada de transcrever a si mesmo */
+      };
+      u.onboundary=function(){ window.jarvisPulso(.95); };
+      u.onend=fimDaFala;
+      u.onerror=fimDaFala;
+      vigia=setInterval(function(){
+        var idade=Date.now()-nascimento;
+        /* nunca comecou: voz quebrada, nao da para esperar para sempre */
+        if(!comecou && idade>4000){ fimDaFala(); return; }
+        /* comecou e a sintese ja parou, mas o evento nao veio */
+        if(comecou && !sintese.speaking && !sintese.pending){ fimDaFala(); return; }
+        /* teto absoluto: fala nenhuma passa de tres minutos */
+        if(idade>180000) fimDaFala();
+      },500);
+      sintese.speak(u);
+    }
+
+    function criar(){
+      rec=new Rec();
+      rec.lang="pt-BR"; rec.interimResults=true; rec.continuous=false;
+      /* ===== Comandos da propria tela =====
+         "Iniciar atualizacoes" e apertar um botao aqui, nao uma ferramenta
+         do servidor — o Jarvis nao consegue clicar no seu navegador. Entao
+         a pagina resolve antes de mandar para o modelo: fica instantaneo e
+         nao gasta token. O que nao casar aqui segue para o Jarvis, que tem
+         as ferramentas de agenda, e-mail, Drive e Obsidian. */
+      rec.onresult=function(ev){
+        var txt="",final=false;
+        for(var i=ev.resultIndex;i<ev.results.length;i++){
+          txt+=ev.results[i][0].transcript;
+          if(ev.results[i].isFinal) final=true;
+        }
+
+        rotulo.textContent="Você"; rotulo.classList.remove("marca");
+        frase.textContent=txt;
+        interino = final ? "" : txt;
+        if(final && txt.trim()){
+          interino="";
+          if(!tentarComando(txt)) perguntar(txt.trim());
+        }
+      };
+      rec.onerror=function(ev){
+        if(ev.error==="no-speech" && ativo){ try{rec.start();}catch(e){} return; }
+        dizer("Microfone: "+ev.error);
+        ativo=false; estado("Conversar",false); desligarMedidor();
+      };
+      rec.onend=function(){
+        /* fechou sem marcar como definitivo: aproveita o que ja foi dito.
+           Durante a fala dele, nao: seria eco virando pergunta. */
+        if(interino.trim() && !pensando && !falando){
+          var t=interino.trim(); interino="";
+          if(!tentarComando(t)){ perguntar(t); return; }
+          return;
+        }
+        if(ativo && !pensando && !falando){ try{rec.start();}catch(e){} }
+      };
+    }
+
+    /* ===== Camada de comandos da tela =====
+       Fica AQUI, e nao dentro de criar(), porque o teclado precisa dela
+       tanto quanto o microfone: antes ela nascia junto com o
+       reconhecimento de voz, e quem escrevia caia direto no modelo.
+       Vale para os dois caminhos — fala e escrita. */
+    function limpa(txt){
+      return txt.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+        .replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+    }
+    var COMANDOS=[
+      {re:/\b(iniciar|comecar|comeca|inicia|rodar|roda|toca|tocar) (as )?(atualizacoes|briefing|resumo)\b|\bme atualiza\b|\bbom dia jarvis\b/,
+       pausa:true, faz:function(){ bIniciar.click(); }},
+      {re:/\b(parar|para|pare|cancela|cancelar|silencio|quieto|chega)\b/,
+       diz:"", faz:function(){ if(sintese) sintese.cancel(); bParar.click(); }},
+      {re:/\b(abre|abrir|mostra|mostrar|ir para|vai para) (o |a |os |as )?(holograma|hologramas|galeria|modelos)( 3d)?\b/,
+       diz:"Abrindo os hologramas.", faz:function(){ location.href="/modelo.html"; }},
+      {re:/\b(abre|abrir|mostra|mostrar|ir para|vai para) (o |a |as )?(universo|segundo cerebro|ceu|grafo|estrelas)\b/,
+       diz:"Abrindo o Segundo Cérebro.", faz:function(){ location.href="/universo.html"; }},
+      {re:/\b(abre|abrir|vai para|ir para) (a |o )?(conversa|chat|jarvis)\b/,
+       diz:"Abrindo a conversa.", faz:function(){ location.href="/?app=1"; }},
+      {re:/\b(abre|abrir|mostra|mostrar) (o )?painel\b|\bdashboard\b/,
+       diz:"Abrindo o painel.", faz:function(){ location.href="/dashboard"; }},
+      {re:/\b(abre|abrir|mostra|mostrar) (as )?configuracoes\b/,
+       diz:"Abrindo as configurações.", faz:function(){ location.href="/settings"; }},
+      {re:/\b(abre|abrir|mostra|mostrar) (os )?(agentes|registros|logs)\b/,
+       diz:"Abrindo.", faz:function(){ location.href="/agents"; }},
+      {re:/\b(abre|abrir|mostra|mostrar) (as )?fontes( de dados)?\b/,
+       diz:"Abrindo as fontes de dados.", faz:function(){ location.href="/data-sources"; }},
+      /* navegador dentro da tela (app proprio). Vem ANTES do "fecha a
+         conversa", que pegaria qualquer "fecha". */
+      {re:/\b(fecha|fechar|tira|tirar) (o |a )?(navegador|site|pagina|internet)\b/,
+       diz:"Fechando o navegador.", faz:function(){ if(window.jarvisPainel) window.jarvisPainel.fechar(); }},
+      {re:/\b(minimiza|minimizar|esconde|esconder) (o )?navegador\b/,
+       diz:"Navegador minimizado.", faz:function(){ if(window.jarvisPainel) window.jarvisPainel.minimizar(); }},
+      {re:/\b(abre|abrir|mostra|mostrar|volta|voltar|traz|trazer)( pro| para o| o)? navegador\b/,
+       diz:"Abrindo o navegador.", faz:function(){
+         if(window.jarvisPainel && window.jarvisPainel.minimizado) window.jarvisPainel.restaurar();
+         else if(window.jarvisPainel) window.jarvisPainel.abrir("https://www.google.com");
+         else window.open("https://www.google.com","_blank"); }},
+      {re:/\b(encerra|encerrar|fecha|fechar|tchau|obrigado jarvis) (a )?(conversa)?\b/,
+       diz:"Até mais.", faz:function(){ bm.click(); }}
+    ];
+    /* ===== "hilux" e so isso =====
+       O Gustavo nao quer dizer "mostra o modelo tridimensional da Toyota
+       Hilux 97". Ele quer dizer "hilux". A tela ja sabe o que esta
+       baixado, entao ela mesma resolve: instantaneo, sem token, e sem o
+       modelo ter chance de chamar a ferramenta errada.
+       Pergunta passa direto ("o que e uma hilux?" nao abre nada): so
+       dispara com um verbo de exibir na frente, ou com a frase inteira
+       sendo o nome do modelo, em ate tres palavras. */
+    var VERBOS=/^(mostra|mostrar|mostre|abre|abrir|abra|exibe|exibir|ver|veja|poe|poem|bota|carrega|carregar|modelo|o|a|os|as|do|da|de|me|na|no|tela|em|3d|tridimensional)\s+/;
+    function comandoModelo(n){
+      if(!modelos3d.length) return null;
+      var alvo=n, cortes=0;
+      while(VERBOS.test(alvo) && cortes<8){ alvo=alvo.replace(VERBOS,""); cortes++; }
+      alvo=alvo.replace(/\s+(em|no|na)\s+3d$/,"").trim();
+      if(!alvo) return segundaChance(n);
+      var nomeInteiro=(alvo===n.trim());
+      if(nomeInteiro && alvo.split(" ").length>3) return segundaChance(n);
+      if(!nomeInteiro && cortes===0) return segundaChance(n);
+      for(var i=0;i<modelos3d.length;i++){
+        var m=modelos3d[i];
+        if(alvo===m.chave || alvo===m.nome) return m;
+      }
+      for(var j=0;j<modelos3d.length;j++){
+        var k=modelos3d[j];
+        if(k.chave.indexOf(alvo)>=0 || k.nome.indexOf(alvo)>=0 ||
+           (alvo.length>3 && alvo.indexOf(k.nome)>=0)) return k;
+      }
+      return segundaChance(n);
+    }
+    /* Segunda chance (14/11/2026): a regra de cima exige a frase arrumada
+       ("abre a hilux"). Fala de verdade vem com sobra — "jarvis, abre o
+       modelo da hilux pra mim", "quero ver a hilux em 3d" — e ai o pedido
+       caia no modelo de linguagem, que ia BUSCAR e BAIXAR de novo em vez de
+       abrir o que ja esta no computador. Aqui basta a frase ter um verbo de
+       abrir e uma palavra marcante do nome de um modelo ja baixado. Pedido
+       de baixar, buscar ou gerar coisa nova fica de fora de proposito. */
+    var QUER_ABRIR=/\b(mostra|mostrar|mostre|abre|abrir|abra|abri|exibe|exibir|ver|veja|carrega|carregar|quero|coloca|bota|poe)\b/;
+    var QUER_NOVO=/\b(baixa|baixar|baixe|busca|buscar|busque|procura|procurar|procure|gera|gerar|gere|cria|criar|novo|nova|outro|outra|lista|listar)\b/;
+    var PALAVRA_FRACA={modelo:1,modelos:1,truck:1,carro:1,para:1,com:1};
+    function segundaChance(n){
+      if(!QUER_ABRIR.test(n) || QUER_NOVO.test(n)) return null;
+      var ditas={}; n.split(" ").forEach(function(p){ ditas[p]=1; });
+      var melhor=null, pontos=0;
+      modelos3d.forEach(function(m){
+        var marcas={}, soma=0;
+        (m.chave+" "+m.nome).split(" ").forEach(function(p){
+          if(p.length>=4 && !PALAVRA_FRACA[p] && !/^[0-9]+$/.test(p)) marcas[p]=1;
+        });
+        for(var p in marcas) if(ditas[p]) soma++;
+        if(soma>pontos){ pontos=soma; melhor=m; }
+      });
+      return melhor;
+    }
+
+    /* Nota do vault pelo nome. Regra mais dura que a dos modelos: nome de
+       nota e comprido e se parece com conversa normal, entao SO dispara
+       com verbo de abrir na frente. "hologramas" sozinho nao abre nada;
+       "abre hologramas" abre. */
+    var VERBO_NOTA=/^(abre|abrir|abra|mostra|mostrar|mostre|ver|veja|consulta|consultar|puxa|puxar|busca|buscar|procura|procurar)\s+(a\s+|o\s+|as\s+|os\s+|minha\s+|meu\s+|nota\s+|anotacao\s+|projeto\s+|do\s+|da\s+|de\s+)*/;
+    function comandoNota(n){
+      if(!notasVault.length) return null;
+      if(!VERBO_NOTA.test(n)) return null;
+      var alvo=n.replace(VERBO_NOTA,"").trim();
+      if(alvo.length<3) return null;
+      for(var i=0;i<notasVault.length;i++){
+        if(notasVault[i].nome===alvo) return notasVault[i];
+      }
+      var melhor=null;
+      for(var j=0;j<notasVault.length;j++){
+        var nt=notasVault[j];
+        if(nt.nome.indexOf(alvo)>=0 || (alvo.length>4 && alvo.indexOf(nt.nome)>=0)){
+          if(!melhor || nt.nome.length<melhor.nome.length) melhor=nt;
+        }
+      }
+      return melhor;
+    }
+
+    function tentarComando(txt){
+      var n=limpa(txt);
+      var mod=comandoModelo(n);
+      if(mod){
+        try{ rec&&rec.stop(); }catch(e){}
+        if(sintese) sintese.cancel();
+        ativo=false; pensando=false; desligarMedidor();
+        dizer("Abrindo "+mod.titulo+".");
+        window.location.href="/modelo.html?m="+encodeURIComponent(mod.id);
+        return true;
+      }
+      var nota=comandoNota(n);
+      if(nota){
+        try{ rec&&rec.stop(); }catch(e){}
+        if(sintese) sintese.cancel();
+        ativo=false; pensando=false; desligarMedidor();
+        dizer("Abrindo "+nota.titulo+".");
+        window.location.href="/universo.html?nota="+encodeURIComponent(nota.arq);
+        return true;
+      }
+      for(var i=0;i<COMANDOS.length;i++){
+        if(COMANDOS[i].re.test(n)){
+          var c=COMANDOS[i];
+          try{ rec&&rec.stop(); }catch(e){}
+          if(sintese) sintese.cancel();   /* corta a fala em andamento */
+          if(c.pausa){
+            /* a tela vai falar sozinha: a conversa sai de cena agora e
+               volta quando as atualizacoes terminarem. Sem isso, o
+               microfone fica ouvindo a propria voz do Jarvis. */
+            ativo=false; pensando=false; desligarMedidor();
+            retomarDepois=true; estado("Atualizando",true);
+            c.faz(); return true;
+          }
+          if(c.diz && sintese && voz){
+            var u=new SpeechSynthesisUtterance(c.diz);
+            u.voice=voz; u.lang=voz.lang; u.rate=.98;
+            u.onstart=function(){ window.jarvisPulso(1); };
+            u.onend=function(){ c.faz(); };
+            u.onerror=function(){ c.faz(); };
+            dizer(c.diz);
+            sintese.speak(u);
+          }else{ c.faz(); }
+          return true;
+        }
+      }
+      return false;
+    }
+
+
+    /* Chat escrito: entra pelo MESMO caminho da voz, entao tudo que a voz
+       executa, o teclado executa — comandos da tela primeiro, Jarvis depois.
+       Serve para quando o microfone nao e opcao: lugar silencioso, barulho
+       em volta, ou ele simplesmente nao entendeu o que voce falou. */
+    /* A tela ja nasce sabendo o que existe: quem escreve nunca liga a
+       conversa por voz, e antes a lista so carregava la. */
+    carregarModelos3d(); carregarNotas();
+
+    window.jarvisEscrever=function(texto){
+      var t=String(texto||"").trim();
+      if(!t || pensando) return;
+      rotulo.textContent="Você"; rotulo.classList.remove("marca");
+      frase.textContent=t;
+      if(!tentarComando(t)) perguntar(t);
+    };
+
+    /* chamado pela tela quando as atualizacoes acabam (ou sao paradas) */
+    window.jarvisFimDasAtualizacoes=function(cancelar){
+      if(!retomarDepois) return;
+      retomarDepois=false;
+      if(cancelar) return;
+      setTimeout(async function(){
+        if(!rec) criar();
+        ativo=true; pensando=true;
+        estado("Ouvindo",true);
+        await ligarMedidor();
+        carregarModelos3d(); carregarNotas();
+        responder("Precisa de mais alguma coisa?");
+      },600);
+    };
+
+    bm.addEventListener("click",async function(){
+      if(ativo){
+        ativo=false; pensando=false;
+        try{ rec && rec.stop(); }catch(e){}
+        if(sintese) sintese.cancel();
+        desligarMedidor(); estado("Conversar",false); repouso();
+        return;
+      }
+      if(!rec) criar();
+      ativo=true; estado("Ouvindo",true);
+      dizer("Pode falar.");
+      await ligarMedidor();
+      carregarModelos3d(); carregarNotas();
+      try{ rec.start(); }catch(e){}
+    });
+    window.addEventListener("beforeunload",function(){
+      ativo=false; interino=""; falando=false;
+      try{ rec&&rec.stop(); }catch(e){} desligarMedidor();
+    });
+  })();
+
+  bParar.addEventListener("click",parar);
+  window.addEventListener("beforeunload",function(){ if(sintese) sintese.cancel(); });
+})();
+</script>
+<script>
+/* ===== A tela executa o que o Jarvis pediu =====
+   Gustavo (12/11/2026): o servidor nao consegue abrir uma aba de navegador
+   — `webbrowser.open` devolvia True e nada acontecia. Em vez de o servidor
+   sair criando processos para conseguir, o sentido se inverteu: a
+   ferramenta deixa um pedido em /api/acao e esta pagina, que ja esta
+   aberta, executa. Quem sabe abrir aba de navegador e o navegador.
+   Pedido vale 90s no servidor e e consumido por quem ler primeiro. */
+(function(){
+  "use strict";
+  function atalho(url,rotulo){
+    /* O Chrome bloqueia window.open fora de um clique. Quando bloquear,
+       o pedido vira um botao em vez de sumir calado. */
+    var d=document.getElementById("jarvis-atalho");
+    if(!d){
+      d=document.createElement("a");
+      d.id="jarvis-atalho"; d.target="_blank"; d.rel="noopener noreferrer";
+      d.style.cssText="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);"+
+        "z-index:9999;padding:11px 18px;background:#0b1118;color:#6fe3f2;"+
+        "border:1px solid #6fe3f2;font:600 12px/1 ui-monospace,Consolas,monospace;"+
+        "letter-spacing:.14em;text-transform:uppercase;text-decoration:none;"+
+        "box-shadow:0 12px 44px -18px #6fe3f2";
+      document.body.appendChild(d);
+    }
+    d.href=url;
+    d.textContent="Abrir "+(rotulo||"pagina")+" →";
+    if(d._t) clearTimeout(d._t);
+    d._t=setTimeout(function(){ if(d.parentNode) d.parentNode.removeChild(d); },25000);
+  }
+  function olhar(){
+    if(document.hidden) return;
+    fetch("/api/acao",{cache:"no-store"}).then(function(r){
+      return r.ok?r.json():null;
+    }).then(function(a){
+      if(!a||!a.tem||!a.url) return;
+      if(a.tipo==="ir"){ window.location.href=a.url; return; }
+      /* no app proprio, o site abre DENTRO da tela */
+      if(window.jarvisPainel && window.jarvisPainel.abrir(a.url)) return;
+      /* Nada de "noopener" aqui: com ele o window.open devolve nulo
+         mesmo quando abre, e o atalho apareceria junto com a aba. Sem
+         ele da para saber o que aconteceu, e o vinculo e cortado logo
+         depois, que e o que o noopener existia para fazer. */
+      var j=null;
+      try{ j=window.open(a.url,"_blank"); }catch(e){}
+      if(j){ try{ j.opener=null; }catch(e){} }
+      else atalho(a.url,a.rotulo);
+    }).catch(function(){});
+  }
+  setInterval(olhar,1500);
+})();
+</script>
+
+<!-- ===== Fechadura, cadastro do rosto e ritual de abertura ===== -->
+<style>
+#tranca{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;align-items:center;
+  justify-content:center;gap:14px;background:radial-gradient(ellipse at 50% 40%,#06142a 0%,#02050c 70%);
+  color:var(--tinta);text-align:center;padding:24px}
+#tranca.ativa{display:flex}
+#tranca h2{margin:0;font-family:var(--display);font-size:13px;letter-spacing:.42em;text-transform:uppercase;color:var(--ciano)}
+#tranca p{margin:0;font-size:13px;line-height:1.6;color:var(--tinta-f);max-width:460px}
+#trancaVideo{width:220px;height:165px;object-fit:cover;transform:scaleX(-1);border:1px solid var(--ciano-f);
+  box-shadow:0 0 40px -10px var(--ciano);background:#000}
+#trancaMsg{color:var(--gelo) !important;min-height:1.6em}
+#tranca input{background:transparent;border:0;border-bottom:1px solid var(--ciano-f);color:var(--tinta);
+  font:500 15px/1.4 ui-monospace,Consolas,monospace;letter-spacing:.12em;text-align:center;padding:8px 6px;width:300px;outline:0}
+#tranca button{font-family:var(--display);font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+  background:transparent;color:var(--ciano);border:1px solid var(--ciano-f);padding:10px 16px;cursor:pointer}
+#tranca button:hover{border-color:var(--ciano)}
+#trancaChaveBox{display:none;flex-direction:column;align-items:center;gap:8px}
+#trancaNova{display:none;font:600 22px/1.3 ui-monospace,Consolas,monospace;letter-spacing:.14em;color:var(--gelo);
+  border:1px dashed var(--ciano);padding:14px 20px;user-select:all}
+/* Tela de espera (pedido de 14/11): enquanto a identidade nao e confirmada,
+   NADA do sistema aparece — so o reator, o nome, a saudacao e o aviso. */
+#portaria{display:none;flex-direction:column;align-items:center;gap:10px;margin-top:6px;text-align:center}
+.travado #portaria{display:flex}
+#portaria .sd{font-family:var(--display);font-size:17px;color:var(--tinta);letter-spacing:.04em}
+#portaria .st{font-size:12.5px;color:var(--ciano);letter-spacing:.14em;text-transform:uppercase;min-height:1.5em}
+#portaria input{background:transparent;border:0;border-bottom:1px solid var(--ciano-f);color:var(--tinta);
+  font:500 14px/1.4 ui-monospace,Consolas,monospace;letter-spacing:.12em;text-align:center;padding:7px 6px;width:280px;outline:0}
+#portaria button{font-family:var(--display);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;
+  background:transparent;color:var(--tinta-f);border:1px solid var(--ciano-f);padding:8px 14px;cursor:pointer}
+#portaria button:hover{color:var(--ciano);border-color:var(--ciano)}
+#trancaVideo.oculto{position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:0;pointer-events:none}
+#janelaVideo{position:fixed;z-index:150;right:6vw;top:14vh;width:min(440px,80vw);display:none;
+  border:1px solid var(--ciano);background:rgba(3,8,16,.92);box-shadow:0 0 50px -12px var(--ciano)}
+#janelaVideo.ativa{display:block}
+#janelaVideo header{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;cursor:move;
+  font-family:var(--display);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ciano);
+  border-bottom:1px solid var(--ciano-f);user-select:none}
+#janelaVideo header button{background:transparent;border:0;color:var(--ciano);font-size:15px;cursor:pointer;line-height:1}
+#janelaVideo iframe{display:block;width:100%;aspect-ratio:16/9;border:0}
+</style>
+
+<div id="tranca" role="dialog" aria-label="Fechadura do Jarvis">
+  <h2 id="trancaTitulo">Jarvis · identificação</h2>
+  <video id="trancaVideo" playsinline muted></video>
+  <p id="trancaMsg">ligando câmera…</p>
+  <div id="trancaNova"></div>
+  <button id="trancaOk" type="button" style="display:none">Anotei a chave · continuar</button>
+  <button id="trancaCancelar" type="button" style="display:none">Cancelar</button>
+</div>
+
+<div id="portaria">
+  <p class="sd" id="portariaSaud">Boa noite</p>
+  <p class="st" id="portariaMsg">Aguardando confirmação de identidade</p>
+  <div id="trancaChaveBox">
+    <input id="trancaChave" type="text" autocomplete="off" spellcheck="false" placeholder="chave de recuperação">
+    <button id="trancaEntrar" type="button">Entrar com a chave</button>
+  </div>
+  <button id="trancaUsarChave" type="button">Usar chave de recuperação</button>
+</div>
+
+<div id="janelaVideo">
+  <header id="janelaAlca"><span>Abertura</span><button id="janelaFechar" type="button" aria-label="Fechar">×</button></header>
+  <div id="janelaCorpo"></div>
+</div>
+
+<script>
+/* ===== Fechadura, cadastro e ritual de abertura =====
+   Gustavo (14/11/2026). Ele quis o rosto como FECHADURA: so ele usa o
+   Jarvis. A tela nasce travada; a camera le o rosto, o SERVIDOR compara com
+   o cadastro e devolve um passe. Sem reconhecimento, entra a chave de
+   recuperacao. Destravou, comeca o ritual: a musica de abertura toca numa
+   janela flutuante por 30 segundos — e "Iniciar atualizacoes" corta ela na
+   hora.
+
+   A imagem da camera nao sai do navegador: daqui so vai ao servidor a
+   assinatura do rosto (128 numeros). O que isto protege e o que nao protege
+   esta escrito em server/tranca_routes.py — em resumo: tranca a tela, nao
+   os arquivos do computador, e uma foto engana webcam comum.
+
+   Sem cadastro feito, nada disto aparece: o Jarvis abre como sempre e o
+   menu Funcionalidades ganha "Ativar fechadura". */
+(function(){
+  var CHAVE_PASSE="jarvis-passe";
+  var VIDEO_ID="9erLsEHAZRI", SEGUNDOS=30;
+  var el=function(i){ return document.getElementById(i); };
+  var tranca=el("tranca"), video=el("trancaVideo"), msg=el("trancaMsg"), titulo=el("trancaTitulo");
+  var boxChave=el("trancaChaveBox"), campoChave=el("trancaChave"), bEntrar=el("trancaEntrar");
+  var bUsarChave=el("trancaUsarChave"), bOk=el("trancaOk"), bCancelar=el("trancaCancelar"), nova=el("trancaNova");
+  var fluxo=null, lendo=false, modo="", coletadas=[];
+
+  function passe(){ try{ return sessionStorage.getItem(CHAVE_PASSE)||""; }catch(e){ return ""; } }
+  function guardarPasse(p){ try{ if(p) sessionStorage.setItem(CHAVE_PASSE,p); }catch(e){} }
+  function posta(caminho,corpo){
+    return fetch("/api/tranca/"+caminho,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(corpo||{})}).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); });
+  }
+  var portaria=el("portaria"), pMsg=el("portariaMsg"), pSaud=el("portariaSaud");
+  /* a portaria mora dentro do centro, logo abaixo do nome JARVIS */
+  (function(){ var c=el("centro"), r=el("rotulo"); if(c&&r) r.insertAdjacentElement("afterend",portaria); })();
+  function dizer(t){ (modo==="abrir"?pMsg:msg).textContent=t; }
+  function lembrar(ligada){ try{ localStorage.setItem("jarvis-tranca", ligada?"1":"0"); }catch(e){} }
+  function sabia(){ try{ return localStorage.getItem("jarvis-tranca"); }catch(e){ return null; } }
+  function destravarTela(){ document.documentElement.classList.remove("travado"); }
+
+  /* ---------- biblioteca de rosto, carregada so quando precisa ---------- */
+  var libPronta=null;
+  function carregarLib(){
+    if(libPronta) return libPronta;
+    libPronta=new Promise(function(ok,erro){
+      var s=document.createElement("script");
+      s.src="/vendor/faceapi/face-api.min.js";
+      s.onload=function(){
+        var base="/vendor/faceapi/modelos";
+        Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(base),
+          faceapi.nets.faceLandmark68Net.loadFromUri(base),
+          faceapi.nets.faceRecognitionNet.loadFromUri(base)
+        ]).then(ok,erro);
+      };
+      s.onerror=function(){ erro(new Error("biblioteca de rosto ausente")); };
+      document.head.appendChild(s);
+    });
+    return libPronta;
+  }
+  /* 16/11: a primeira leitura do rosto demorava porque as redes so eram
+     "compiladas" na placa de video na hora de ler. Aqui elas rodam uma vez
+     numa imagem vazia enquanto a camera ainda esta ligando. */
+  /* 17/11: o aquecimento trava a tela por uns segundos (a placa de video
+     compila as redes), e a fala "Aguardando confirmacao de identidade" so
+     saia depois dele — quase junto com "identidade confirmada". Agora o
+     aquecimento ESPERA a fala comecar (no maximo 2,5 s). */
+  var avisoFalou=null, soltarAviso=function(){};
+  avisoFalou=new Promise(function(ok){ soltarAviso=ok; setTimeout(ok,2500); });
+  var aquecida=null;
+  function aquecerLib(){
+    if(aquecida) return aquecida;
+    aquecida=Promise.all([carregarLib(), avisoFalou]).then(async function(){
+      var c=document.createElement("canvas"); c.width=c.height=160;
+      var g=c.getContext("2d"); g.fillStyle="#777"; g.fillRect(0,0,160,160);
+      try{ await faceapi.detectSingleFace(c,new faceapi.TinyFaceDetectorOptions({inputSize:224,scoreThreshold:.5})); }catch(e){}
+      try{ await faceapi.nets.faceLandmark68Net.detectLandmarks(c); }catch(e){}
+      try{ await faceapi.computeFaceDescriptor(c); }catch(e){}
+    });
+    return aquecida;
+  }
+  async function ligarCamera(){
+    fluxo=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480,facingMode:"user"},audio:false});
+    video.srcObject=fluxo; await video.play().catch(function(){});
+  }
+  function desligarCamera(){
+    lendo=false;
+    if(fluxo){ fluxo.getTracks().forEach(function(t){ t.stop(); }); fluxo=null; }
+    video.srcObject=null;
+  }
+  async function lerRosto(){
+    var r=await faceapi.detectSingleFace(video,new faceapi.TinyFaceDetectorOptions({inputSize:224,scoreThreshold:.5}))
+      .withFaceLandmarks().withFaceDescriptor();
+    return r ? Array.from(r.descriptor) : null;
+  }
+  function fechar(){
+    desligarCamera(); modo="";
+    tranca.classList.remove("ativa");
+    document.documentElement.classList.remove("travado");
+    nova.style.display="none"; bOk.style.display="none"; bCancelar.style.display="none";
+    boxChave.style.display="none"; bUsarChave.style.display=""; video.style.display="";
+    video.classList.remove("oculto"); tranca.insertBefore(video, msg);
+  }
+
+  /* ---------------------------- destravar ---------------------------- */
+  async function travar(){
+    modo="abrir";
+    /* tela de espera: reator, JARVIS, saudacao e o aviso. A camera trabalha
+       sem aparecer (o video fica com 2 px, so para o detector ter imagem). */
+    var sd=el("saudacao"); pSaud.textContent=(sd&&sd.textContent.trim())||"Olá";
+    video.classList.add("oculto"); document.body.appendChild(video);
+    document.documentElement.classList.add("travado");
+    dizer("Aguardando confirmação de identidade");
+    avisarEspera();
+    /* 19/11: medidas de tempo mostradas na tela, para achar a lentidao */
+    var t0=Date.now(), seg=function(a,b){ return ((b-a)/1000).toFixed(1).replace(".",",")+" s"; };
+    try{
+      /* camera e biblioteca ao mesmo tempo (antes era uma depois da outra) */
+      await Promise.all([ligarCamera(), aquecerLib()]);
+    }catch(e){
+      dizer("Câmera indisponível · use a chave de recuperação");
+      mostrarChave(); return;
+    }
+    var tPronto=Date.now();
+    console.log("[tempo] camera+modelos prontos em "+seg(t0,tPronto));
+    dizer("Lendo o rosto · câmera e modelos prontos em "+seg(t0,tPronto));
+    lendo=true; var inicio=Date.now(), ocupado=false;
+    (function laco(){
+      if(!lendo || modo!=="abrir") return;
+      setTimeout(laco,250);
+      if(ocupado) return; ocupado=true;
+      var tLer=Date.now();
+      lerRosto().then(function(d){
+        console.log("[tempo] leitura do rosto "+seg(tLer,Date.now()));
+        if(!d){ if(Date.now()-inicio>12000) mostrarChave(); return null; }
+        return posta("abrir",{assinatura:d});
+      }).then(function(r){
+        if(r && r.ok){ guardarPasse(r.passe);
+                       dizer("Identidade confirmada · "+seg(t0,Date.now())+" (pronto em "+seg(t0,tPronto)+")"); lendo=false;
+                       /* 19/11: fala "Identidade confirmada" e so depois vem a recepcao */
+                       setTimeout(function(){
+                         fechar();
+                         var fala=window.speechSynthesis, feito=false;
+                         function seguir(){ if(feito) return; feito=true; boasVindas(); }
+                         if(!fala){ seguir(); return; }
+                         var voz=vozRapida()||vozDoJarvis();
+                         var u=new SpeechSynthesisUtterance("Identidade confirmada.");
+                         if(voz){ u.voice=voz; u.lang=voz.lang; } else u.lang="pt-BR";
+                         u.rate=.98;
+                         u.onend=function(){ setTimeout(seguir,250); };
+                         u.onerror=seguir;
+                         /* 19/11: a voz online leva alguns segundos para comecar; antes
+                            o limite de 3,5 s cortava a frase (a recepcao cancela a fila).
+                            Agora espera ate 12 s para comecar e, se ja comecou, ate 15 s. */
+                         var relogio=setTimeout(seguir,12000);
+                         u.onstart=function(){ clearTimeout(relogio); relogio=setTimeout(seguir,15000); };
+                         try{ fala.cancel(); fala.speak(u); }catch(e){ seguir(); }
+                       },600); }
+        else if(r){ dizer("Rosto não reconhecido"); if(Date.now()-inicio>12000) mostrarChave(); }
+      }).catch(function(){}).then(function(){ ocupado=false; });
+    })();
+  }
+  function mostrarChave(){ boxChave.style.display="flex"; bUsarChave.style.display="none"; }
+  bUsarChave.addEventListener("click",function(){ mostrarChave(); campoChave.focus(); });
+  function entrarComChave(){
+    var c=campoChave.value.trim(); if(!c) return;
+    posta("abrir",{chave:c}).then(function(r){
+      if(r.ok){ campoChave.value=""; guardarPasse(r.passe); fechar(); boasVindas(); }
+      else dizer(r.espera ? "Muitas tentativas. Aguarde "+r.espera+" s." : "Chave incorreta.");
+    }).catch(function(){ dizer("O servidor não respondeu."); });
+  }
+  bEntrar.addEventListener("click",entrarComChave);
+  campoChave.addEventListener("keydown",function(e){ if(e.key==="Enter") entrarComChave(); });
+
+  /* ---------------------------- cadastro ---------------------------- */
+  async function cadastrar(){
+    modo="cadastro"; coletadas=[]; titulo.textContent="Cadastro do rosto";
+    tranca.classList.add("ativa");
+    bCancelar.style.display="";
+    dizer("ligando câmera…");
+    try{ await ligarCamera(); dizer("carregando reconhecimento…"); await carregarLib(); }
+    catch(e){ dizer("Não consegui ligar a câmera ou carregar o reconhecimento."); return; }
+    lendo=true; var ocupado=false;
+    (function laco(){
+      if(!lendo || modo!=="cadastro") return;
+      if(coletadas.length>=6){ enviarCadastro(); return; }
+      setTimeout(laco,600);
+      if(ocupado) return; ocupado=true;
+      lerRosto().then(function(d){
+        if(d){ coletadas.push(d); dizer("lendo seu rosto… "+coletadas.length+" de 6 · mexa a cabeça de leve"); }
+        else dizer("não achei um rosto · fique de frente, com luz no rosto");
+      }).catch(function(){}).then(function(){ ocupado=false; });
+    })();
+  }
+  function enviarCadastro(){
+    lendo=false;
+    posta("cadastrar",{assinaturas:coletadas,passe:passe()}).then(function(r){
+      desligarCamera(); video.style.display="none"; bCancelar.style.display="none";
+      if(!r.ok){ dizer("Não cadastrou: "+(r.motivo||"erro")); bCancelar.style.display=""; return; }
+      guardarPasse(r.passe); lembrar(true);
+      titulo.textContent="Chave de recuperação";
+      nova.textContent=r.chave_recuperacao; nova.style.display="block";
+      dizer("ANOTE esta chave agora, num papel ou no gerenciador de senhas. Ela aparece só desta vez e é o único jeito de entrar se a câmera não te reconhecer.");
+      bOk.style.display="";
+    }).catch(function(){ dizer("O servidor não respondeu. Reinicie o Jarvis e tente de novo."); bCancelar.style.display=""; });
+  }
+  bOk.addEventListener("click",function(){ nova.textContent=""; fechar(); atualizarMenu(true); });
+  bCancelar.addEventListener("click",fechar);
+
+  /* ------------------------- ritual de abertura ------------------------- */
+  var janela=el("janelaVideo"), corpo=el("janelaCorpo"), alca=el("janelaAlca"), relogio=0;
+  /* "Se eu mexer, interrompo": qualquer clique ou tecla FORA da janela da
+     musica encerra a abertura. Mexer so o mouse nao conta (senao cortaria
+     sem querer), e clicar na propria janela serve para arrasta-la. */
+  function aoMexer(e){
+    if(e.target && e.target.closest && e.target.closest("#janelaVideo")) return;
+    fecharJanela();
+  }
+  function vigiarMexida(liga){
+    ["pointerdown","keydown"].forEach(function(t){
+      if(liga) document.addEventListener(t,aoMexer,true); else document.removeEventListener(t,aoMexer,true);
+    });
+  }
+  function fecharJanela(){ clearTimeout(relogio); vigiarMexida(false); pararSom(); corpo.innerHTML=""; janela.classList.remove("ativa"); }
+  /* Musica de abertura. Duas fontes, nesta ordem:
+       1) /abertura.mp3 — um arquivo de audio do proprio Gustavo, posto na
+          pasta static. Toca os primeiros 30 s, com as barras da janela e o
+          REATOR pulsando no ritmo de verdade (o som passa por um analisador).
+       2) sem arquivo, tenta o player do YouTube na janela.
+     Por que o arquivo vem primeiro: testados em 15/11, os clipes oficiais
+     (pAgnJDJN4VA e 9erLsEHAZRI) dao "video nao disponivel" fora do site do
+     YouTube — a gravadora bloqueia a incorporacao, e isso nao tem conserto
+     do nosso lado. */
+  var som=null, acomp=null, ctxSom=null, quadroSom=0;
+  function pararSom(){
+    cancelAnimationFrame(quadroSom);
+    if(som){ try{ som.pause(); }catch(e){} som.src=""; som=null; }
+    if(acomp){ try{ acomp.pause(); }catch(e){} acomp.src=""; acomp=null; }
+    if(ctxSom){ try{ ctxSom.close(); }catch(e){} ctxSom=null; }
+  }
+  /* fontes locais, na ordem: abertura.mp4 (o clipe aparece na janela) e
+     abertura.mp3 (so audio, com as barras). Falhou uma, tenta a proxima; no
+     fim da lista, YouTube. */
+  /* "abertura.mp4.mp4" entra na lista porque o Windows esconde a extensao e
+     o arquivo acabou salvo com ela dobrada (15/11). */
+  var FONTES=["/abertura.mp4","/abertura.mp4.mp4","/abertura.mp3"];
+  function tocarArquivo(qual){
+    qual=qual||0;
+    if(qual>=FONTES.length){ tocarYoutube(); return; }
+    var ehVideo=/\.mp4$/.test(FONTES[qual]);
+    corpo.innerHTML=(ehVideo?'<video id="janelaClipe" playsinline style="display:block;width:100%;background:#000"></video>':'')
+      +'<canvas id="janelaBarras" width="440" height="'+(ehVideo?46:150)+'" style="display:block;width:100%;height:'+(ehVideo?46:150)+'px"></canvas>';
+    janela.classList.add("ativa");
+    var cv=el("janelaBarras"), g=cv.getContext("2d");
+    som=ehVideo?el("janelaClipe"):new Audio();
+    som.src=FONTES[qual]; som.volume=0;
+    /* O analisador (barras + reator no ritmo) so entra se o motor de audio
+       do navegador estiver LIGADO. Em 15/11 o video abriu mudo: o som era
+       desviado para um motor que o navegador mantinha suspenso por falta de
+       clique, e ai nao saia por lugar nenhum. Agora, enquanto o motor nao
+       liga, a musica sai direto pelo alto-falante — sem barras, mas com som. */
+    function ligarBarras(){
+     try{
+      var fonte=ctxSom.createMediaElementSource(som), an=ctxSom.createAnalyser();
+      an.fftSize=128; fonte.connect(an); an.connect(ctxSom.destination);
+      var dados=new Uint8Array(an.frequencyBinCount);
+      (function desenhar(){
+        quadroSom=requestAnimationFrame(desenhar);
+        an.getByteFrequencyData(dados);
+        g.clearRect(0,0,cv.width,cv.height);
+        var n=40, larg=cv.width/n, soma=0;
+        for(var k=0;k<n;k++){
+          var v=dados[k]/255; soma+=v;
+          g.fillStyle="rgba(111,227,242,"+(0.35+v*0.65)+")";
+          g.fillRect(k*larg+2, cv.height-6-v*(cv.height-16), larg-4, v*(cv.height-16)+2);
+        }
+        if(window.jarvisPulso) window.jarvisPulso(Math.min(1,(soma/n)*1.6));   /* reator no ritmo */
+      })();
+     }catch(e){ /* sem analisador a musica toca do mesmo jeito, so sem barras */ }
+    }
+    try{
+      ctxSom=new (window.AudioContext||window.webkitAudioContext)();
+      var ligou=false, tentar=function(){
+        if(ligou || !ctxSom || !som) return;
+        if(ctxSom.state==="running"){ ligou=true; ligarBarras(); }
+      };
+      ctxSom.onstatechange=tentar;
+      ctxSom.resume().then(tentar,function(){});
+    }catch(e){}
+    /* Clipe sem som (15/11): o abertura.mp4 que o Gustavo baixou veio so com
+       a imagem — o navegador decodificou zero bytes de audio dele. Entao, se
+       houver um abertura.mp3 na pasta, ele toca JUNTO com o clipe e faz o
+       papel do som. Sem mp3, o clipe toca com o audio que tiver. */
+    if(ehVideo){
+      ["/abertura.mp3","/abertura.mp3.mp3"].forEach(function(u){
+        var a=new Audio(); a.preload="auto"; a.src=u;
+        a.addEventListener("canplay",function(){
+          if(acomp || !som){ a.src=""; return; }
+          acomp=a; acomp.volume=0.85; acomp.currentTime=som.currentTime||0;
+          acomp.play().catch(function(){});
+        },{once:true});
+      });
+    }
+    som.play().then(function(){
+      /* entra e sai suave, para nao cortar seco */
+      var t0=Date.now();
+      var rampa=setInterval(function(){
+        if(!som){ clearInterval(rampa); return; }
+        var s=(Date.now()-t0)/1000;
+        /* a musica toca INTEIRA (pedido de 15/11): entra suave, sai suave
+           nos ultimos 2 s e a janela fecha quando ela acaba. */
+        var total=isFinite(som.duration)?som.duration:0, resta=total?total-som.currentTime:99;
+        som.volume=Math.max(0,Math.min(1, s<1.5 ? s/1.5 : (resta<2 ? resta/2 : 1)))*0.85;
+        if(som.ended){ clearInterval(rampa); fecharJanela(); }
+      },120);
+      som.addEventListener("ended",fecharJanela);
+    }).catch(function(e){
+      if(e && e.name==="NotAllowedError"){
+        cancelAnimationFrame(quadroSom);
+        corpo.innerHTML='<p style="margin:0;padding:18px;font-size:12px;color:var(--tinta-f)">O navegador segurou o som. Abra o Jarvis pelo atalho da área de trabalho, que libera a música.</p>';
+      }else{ pararSom(); tocarArquivo(qual+1); }   /* sem este arquivo: tenta o proximo */
+    });
+  }
+  function tocarYoutube(){
+    corpo.innerHTML='<iframe allow="autoplay; encrypted-media" allowfullscreen '
+      +'src="https://www.youtube-nocookie.com/embed/'+VIDEO_ID+'?autoplay=1&rel=0&modestbranding=1&playsinline=1"></iframe>';
+    janela.classList.add("ativa");
+  }
+  /* Tenta o arquivo direto. Se ele nao existir (ou nao for audio), o proprio
+     elemento de audio acusa erro e a janela cai para o YouTube. */
+  /* ===== Boas-vindas faladas, antes da musica (16/11) =====
+     Logo depois da identidade confirmada o Jarvis diz a saudacao e o dia
+     exato — "Boa noite, senhor. Hoje é segunda-feira, 16 de novembro." — e
+     SO ENTAO a musica comeca. A leitura das atualizacoes nao muda nada.
+     Usa a mesma voz escolhida no seletor do rodape. Se a voz nao sair em
+     poucos segundos (navegador segurando o som), segue para a musica do
+     mesmo jeito, para o ritual nunca travar aqui. */
+  var DIAS=["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
+  var MESES=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  function fraseDoDia(){
+    /* "Bem-vindo, senhor." no lugar de bom dia/boa tarde/boa noite: a
+       saudacao por horario ja aparece nas atualizacoes, e repetir ficava
+       cansativo (pedido de 16/11). */
+    var d=new Date();
+    return "Bem-vindo senhor. Hoje é "+DIAS[d.getDay()]+", "+d.getDate()+" de "+MESES[d.getMonth()]+".";
+  }
+  /* 19/11: as frases de inicio (aguardando / identidade confirmada) saem na
+     hora pela voz local Alex; a Microsoft demora para responder depois de
+     ligar o PC. */
+  function vozRapida(){
+    var fala=window.speechSynthesis; if(!fala) return null;
+    var vs=fala.getVoices()||[];
+    return vs.filter(function(v){ return v.name==="Alex"; })[0]||null;
+  }
+  /* a mesma voz escolhida no seletor do rodape */
+  function vozDoJarvis(){
+    var fala=window.speechSynthesis; if(!fala) return null;
+    var vs=fala.getVoices()||[], nome="";
+    try{ nome=localStorage.getItem("jarvis.voz")||""; }catch(e){}
+    var pt=vs.filter(function(v){ return /^pt/i.test(v.lang); });
+    return (nome&&pt.filter(function(v){ return v.name===nome; })[0])
+          ||pt.filter(function(v){ return /BR/i.test(v.lang); })[0]||pt[0]||null;
+  }
+  /* Tela de espera falada (16/11): ao travar, ele diz o que esta na tela.
+     As vozes chegam um instante depois de a pagina abrir; se ainda nao
+     chegaram, espera por elas (ate 3 s) antes de falar. */
+  /* 19/11: a frase ainda nao saia ha dias. Ao ligar o PC a voz (Kokoro ou a
+     do Windows) ainda nao esta pronta e a fala falhava em silencio, uma vez
+     so. Agora ela tenta de novo ate COMECAR de verdade: se der erro, ou se
+     nao comecar em 4 s, fala outra vez (no maximo 6 vezes). */
+  function avisarEspera(){
+    var fala=window.speechSynthesis; if(!fala) return;
+    var tent=0, comecou=false, ultimo=null, relogio=0;
+    function falar(){
+      if(modo!=="abrir" || comecou) return;        /* ja destravou ou ja falou */
+      if(++tent>6){ soltarAviso(); return; }
+      clearTimeout(relogio);
+      var voz=vozRapida()||vozDoJarvis();
+      var u=new SpeechSynthesisUtterance("Aguardando confirmação de identidade.");
+      if(voz){ u.voice=voz; u.lang=voz.lang; } else u.lang="pt-BR";
+      u.rate=.98;
+      ultimo=u;
+      u.onstart=function(){
+        if(u!==ultimo) return;
+        comecou=true; clearTimeout(relogio);
+        setTimeout(soltarAviso,300);
+      };
+      u.onerror=function(){
+        if(u!==ultimo || comecou) return;          /* erro de uma tentativa antiga */
+        clearTimeout(relogio); setTimeout(falar,700);
+      };
+      u.onend=function(){ comecou=true; setTimeout(soltarAviso,0); };
+      /* nao comecou em 4 s: a voz travou, tenta de novo */
+      relogio=setTimeout(function(){
+        if(comecou || modo!=="abrir") return;
+        ultimo=null;                               /* ignora o erro da tentativa parada */
+        try{ fala.cancel(); }catch(e){}
+        falar();
+      },4000);
+      try{ fala.speak(u); }catch(e){ clearTimeout(relogio); setTimeout(falar,700); }
+    }
+    /* as vozes podem demorar um pouco a chegar depois que a pagina abre */
+    var espera=0;
+    (function esperarVoz(){
+      if(modo!=="abrir") return;
+      if(vozDoJarvis() || espera++>=6) falar();
+      else setTimeout(esperarVoz,500);
+    })();
+  }
+  function boasVindas(){
+    /* veio de outra tela travada (?volta=): identificou, volta para la, sem
+       recepcao nem musica. So aceita caminho deste mesmo servidor. */
+    var volta=new URLSearchParams(location.search).get("volta")||"";
+    if(/^\/[^\/\\]/.test(volta)){ location.replace(volta); return; }
+    var frase=fraseDoDia(), foi=false;
+    function seguir(){ if(foi) return; foi=true; ritual(); }
+    var fala=window.speechSynthesis;
+    if(!fala){ seguir(); return; }
+    var voz=vozDoJarvis();
+    var u=new SpeechSynthesisUtterance(frase);
+    if(voz){ u.voice=voz; u.lang=voz.lang; } else u.lang="pt-BR";
+    u.rate=.98;
+    var comecou=false;
+    u.onstart=function(){ comecou=true; };
+    u.onend=function(){ setTimeout(seguir,350); };
+    u.onerror=seguir;
+    try{ fala.cancel(); fala.speak(u); }catch(e){ seguir(); return; }
+    /* vigia: nao comecou em 4 s, ou passou de 15 s falando, vai para a musica */
+    setTimeout(function(){ if(!comecou) seguir(); },10000);
+    setTimeout(seguir,15000);
+    (function espera(){ if(foi) return; if(comecou && !fala.speaking && !fala.pending){ setTimeout(seguir,350); return; } setTimeout(espera,400); })();
+  }
+  function ritual(){ tocarArquivo(0); setTimeout(function(){ if(janela.classList.contains("ativa")) vigiarMexida(true); },800); }
+  el("janelaFechar").addEventListener("click",fecharJanela);
+  /* "Iniciar atualizacoes" (botao, voz ou chat) corta a musica na hora */
+  var bIni=el("bIniciar"); if(bIni) bIni.addEventListener("click",fecharJanela,true);
+  (function arrastar(){
+    var px=0,py=0,segurando=false;
+    alca.addEventListener("pointerdown",function(e){
+      if(e.target.tagName==="BUTTON") return;
+      segurando=true; var r=janela.getBoundingClientRect(); px=e.clientX-r.left; py=e.clientY-r.top;
+      alca.setPointerCapture(e.pointerId);
+    });
+    alca.addEventListener("pointermove",function(e){
+      if(!segurando) return;
+      janela.style.left=Math.max(0,e.clientX-px)+"px"; janela.style.top=Math.max(0,e.clientY-py)+"px"; janela.style.right="auto";
+    });
+    alca.addEventListener("pointerup",function(){ segurando=false; });
+  })();
+
+  /* ------------------------------ menu ------------------------------ */
+  function atualizarMenu(cadastrado){
+    var lista=el("lista"); if(!lista) return;
+    var velho=el("mTranca"); if(velho) velho.remove();
+    var a=document.createElement("a"); a.id="mTranca"; a.href="#";
+    a.textContent=cadastrado?"Recadastrar rosto":"Ativar fechadura";
+    a.addEventListener("click",function(e){ e.preventDefault(); cadastrar(); });
+    lista.appendChild(a);
+    var velho2=el("mTrancaOff"); if(velho2) velho2.remove();
+    if(cadastrado){
+      var b=document.createElement("a"); b.id="mTrancaOff"; b.href="#"; b.textContent="Desativar fechadura";
+      b.addEventListener("click",function(e){
+        e.preventDefault();
+        posta("remover",{passe:passe()}).then(function(r){ if(r.ok){ lembrar(false); atualizarMenu(false); } });
+      });
+      lista.appendChild(b);
+    }
+  }
+
+  /* ------------------------------ partida ------------------------------ */
+  /* Se ja se sabe que ha fechadura e nao ha passe nesta aba, a camera liga
+     JA, sem esperar o servidor — ele pode levar segundos para responder logo
+     depois de subir. */
+  if(sabia()!=="0" && !passe()) aquecerLib().catch(function(){});
+  if(sabia()==="1" && !passe()) travar();
+  fetch("/api/tranca/estado",{cache:"no-store"}).then(function(r){ if(!r.ok) throw 0; return r.json(); })
+  .then(function(e){
+    atualizarMenu(!!e.cadastrado);
+    lembrar(!!e.cadastrado);
+    if(!e.cadastrado){ if(modo==="abrir") fechar(); destravarTela(); return; }
+    return posta("conferir",{passe:passe()}).then(function(c){
+      if(c.ok){ if(modo==="abrir") fechar(); destravarTela(); }
+      else if(modo!=="abrir") travar();
+    });
+  }).catch(function(){ if(modo==="abrir") fechar(); destravarTela(); /* servidor fora do ar: nao ha o que proteger nem o que mostrar */ });
+  window.jarvisRitual=ritual;   /* para testar a janela sem passar pela camera */
+})();
+</script>
